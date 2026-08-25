@@ -566,6 +566,29 @@ class _SettingsPageState extends State<SettingsPage>
           UiSettings.save();
         }, suffix: '${(v * 100).toInt()}%'),
       ),
+      _sep(),
+      Btn25D(
+        base: t.surface,
+        radius: 999,
+        onTap: () {
+          final dir =
+              '${File(Platform.resolvedExecutable).parent.path}\\data\\flutter_assets\\assets';
+          Process.run('explorer', [dir]);
+        },
+        padding: EdgeInsets.symmetric(horizontal: sc(12), vertical: sc(9)),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.folder_open_rounded, size: sc(14), color: t.accent),
+            SizedBox(width: sc(6)),
+            Text(tr('Папка со звуками', 'Sounds folder'),
+                style: TextStyle(
+                    fontSize: sc(11),
+                    color: t.text,
+                    fontWeight: FontWeight.w600)),
+          ],
+        ),
+      ),
     ]),
     _gap(),
     _card(title: tr('События', 'Events'), icon: Icons.tune_rounded, children: [
