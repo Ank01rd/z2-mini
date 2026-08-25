@@ -1,5 +1,7 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:tray_manager/tray_manager.dart';
+import 'core/sound_service.dart';
 import 'package:window_manager/window_manager.dart';
 import 'app.dart';
 import 'core/app_visibility.dart';
@@ -7,8 +9,23 @@ import 'core/ui_settings.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // 🚫 один экземпляр: если z2_mini.exe уже работает — тихо выходим
+  try {
+    final r = await Process.run(
+        'tasklist', ['/FI', 'IMAGENAME eq z2_mini.exe', '/NH'],
+        runInShell: true);
+    final n = r.stdout
+        .toString()
+        .split(RegExp(r'[\r\n]+'))
+        .where((l) => l.toLowerCase().contains('z2_mini.exe'))
+        .length;
+    if (n > 1) exit(0);
+  } catch (_) {}
+
   await windowManager.ensureInitialized();
   UiSettings.load();
+  SoundService.warmup(); // 🔥 первый «хруст» уходит в тишину
 
   const opts = WindowOptions(
     minimumSize: Size(760, 560),

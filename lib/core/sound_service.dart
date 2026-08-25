@@ -3,7 +3,12 @@ import 'package:flutter/foundation.dart';
 import 'ui_settings.dart';
 
 /// 🔊 Саунд-дизайн Z2 Mini: короткие звуки на ключевые события.
-/// Мягкая атака МЕЛКИМИ шагами громкости — без резкости и без «хруста».
+/// Рецепт воспроизведения взят из Z2 pro — там хруста НЕТ:
+///   1) setVolume ДО старта
+///   2) stop() — жёсткий сброс плеера
+///   3) play()
+/// Никаких смен громкости во время воспроизведения —
+/// именно они «хрустели» в мини (зиппер-шум на Windows).
 class SoundService {
   static final AudioPlayer _p = AudioPlayer();
 
@@ -28,7 +33,7 @@ class SoundService {
     'error': 'Ошибка',
   };
 
-  static Future<void> play(String event, {int fadeMs = 100}) async {
+  static Future<void> play(String event) async {
     if (!UiSettings.soundEnabled.value) return;
     try {
       final custom = UiSettings.soundPath(event);
@@ -40,34 +45,27 @@ class SoundService {
       }
       if (src == null) return;
 
-      // не трогаем плеер, если он простаивает — убирает щелчок
-      if (_p.state == PlayerState.playing) await _p.stop();
-
-      final target = UiSettings.soundVolume.value;
-      if (fadeMs <= 0) {
-        await _p.setVolume(target);
-        await _p.play(src);
-        return;
+      // 🎯 как в Z2 pro: громкость → сброс → старт.
+      // Громкость берём из слайдера настроек (вместо профовских 0.1).
+      await _p.setVolume(UiSettings.soundVolume.value);
+      if (_p.state == PlayerState.playing) {
+        await _p.stop();
       }
-
-      // плавная атака: старт с 10%, далее 10 мелких шагов по ~10%
-      await _p.setVolume(target * 0.1);
       await _p.play(src);
-      const steps = 10;
-      for (var i = 1; i <= steps; i++) {
-        await Future.delayed(Duration(milliseconds: fadeMs ~/ steps));
-        await _p.setVolume(target * (0.1 + 0.9 * i / steps));
-      }
     } catch (e) {
       debugPrint('Sound: $e');
     }
   }
 
+  /// 🕳 стаб для совместимости: если в main.dart остался вызов
+  ///    SoundService.warmup() — он больше не нужен, рецепт и так чистый.
+  static Future<void> warmup() async {}
+
   static Future<void> preview(String event) => play(event);
-  static Future<void> click() => play('click', fadeMs: 30);
-  static Future<void> toggle() => play('toggle', fadeMs: 50);
+  static Future<void> click() => play('click');
+  static Future<void> toggle() => play('toggle');
   static Future<void> start() => play('start');
   static Future<void> stop() => play('stop');
-  static Future<void> notify() => play('notify', fadeMs: 160);
+  static Future<void> notify() => play('notify');
   static Future<void> error() => play('error');
 }

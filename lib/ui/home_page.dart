@@ -79,8 +79,11 @@ class _HomePageState extends State<HomePage> {
       ipsetFilter: _ipsetFilter,
     );
     await _zapret.start(sel);
-    ToastService.show(tr('Zapret активен', 'Zapret active'), Icons.rocket_launch_rounded);
+    // 🔊 сначала звук запуска, потом ТИХИЙ тост —
+    //    иначе notify от тоста обрывает звук старта
     SoundService.start();
+    NotifyService.push(tr('Zapret активен', 'Zapret active'),
+        icon: Icons.rocket_launch_rounded, sound: false);
     // ⚡ Оптимизация: ретрай статус вместо слепой задержки
     for (var i = 0; i < 5; i++) {
       await Future.delayed(const Duration(milliseconds: 300));
@@ -101,8 +104,9 @@ class _HomePageState extends State<HomePage> {
 
   Future<void> _stop() async {
     await _zapret.stop();
-    ToastService.show(tr('Остановлен', 'Stopped'), Icons.stop_circle_rounded);
     SoundService.stop();
+    NotifyService.push(tr('Остановлен', 'Stopped'),
+        icon: Icons.stop_circle_rounded, sound: false);
     for (var i = 0; i < 5; i++) {
       await Future.delayed(const Duration(milliseconds: 300));
       final running = await _zapret.isRunning();
