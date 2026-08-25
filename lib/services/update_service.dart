@@ -23,7 +23,7 @@ class UpdateService {
   static const String repo = 'Ank01rd/z2-mini';
 
   /// текущая версия билда — МЕНЯЙ при каждом релизе!
-static const String currentVersion = '1.0.4';
+static const String currentVersion = '1.0.5';
 
   static bool _busy = false;
 
@@ -176,7 +176,7 @@ rmdir /S /Q "$workDir"
 ''');
     // ✅ как в профе: PowerShell Start-Process, скрытое окно,
     //    отдельное дерево процессов — никаких диалогов «не найдено»
-    await Process.run('powershell', [
+        await Process.run('powershell', [
       '-Command',
       'Start-Process -FilePath "cmd.exe" -ArgumentList \'/c "$bat"\' -WindowStyle Hidden'
     ]);
