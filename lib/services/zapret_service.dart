@@ -9,17 +9,27 @@ class ZapretService {
   String get zapretDir => _zapretDir;
   set zapretDir(String p) => _zapretDir = p;
 
+  // ── сохранённый путь к папке Zapret ────────────────────────────
+
   Future<String?> getSavedPath() async {
-    final file = File('${Platform.environment['APPDATA']}\\Z2Mini\\zapret_path.json');
+    final file =
+        File('${Platform.environment['APPDATA']}\\Z2Mini\\zapret_path.json');
     if (!await file.exists()) return null;
-    try { return (jsonDecode(await file.readAsString()))['path'] as String?; } catch (_) { return null; }
+    try {
+      return (jsonDecode(await file.readAsString()))['path'] as String?;
+    } catch (_) {
+      return null;
+    }
   }
 
   Future<void> savePath(String path) async {
-    final file = File('${Platform.environment['APPDATA']}\\Z2Mini\\zapret_path.json');
+    final file =
+        File('${Platform.environment['APPDATA']}\\Z2Mini\\zapret_path.json');
     file.parent.createSync(recursive: true);
     await file.writeAsString(jsonEncode({'path': path}));
   }
+
+  // ── конфиги: все .bat кроме service.bat, сортировка как в проводнике ──
 
   Future<List<String>> scanConfigs() async {
     final dir = Directory(_zapretDir);
@@ -33,7 +43,7 @@ class ZapretService {
         }
       }
     }
-    configs.sort(_naturalCompare); // как в проводнике: ALT2 раньше ALT10
+    configs.sort(_naturalCompare); // ALT2 раньше ALT10
     return configs;
   }
 
@@ -54,18 +64,25 @@ class ZapretService {
     return pa.length.compareTo(pb.length);
   }
 
+  // ── статус / запуск / остановка ────────────────────────────────
+
   Future<bool> isRunning() async {
     try {
-      final r = await Process.run('tasklist', ['/FI', 'IMAGENAME eq winws.exe', '/NH'], runInShell: true);
+      final r = await Process.run(
+          'tasklist', ['/FI', 'IMAGENAME eq winws.exe', '/NH'],
+          runInShell: true);
       return r.stdout.toString().toLowerCase().contains('winws.exe');
-    } catch (_) { return false; }
+    } catch (_) {
+      return false;
+    }
   }
 
   Future<String> start(String configName) async {
     final path = '$_zapretDir\\$configName';
     await Process.run('powershell', [
       '-Command',
-      'Start-Process -FilePath "cmd.exe" -ArgumentList \'/c ""$path""\' '
+      'Start-Process -FilePath "cmd.exe" '
+          '-ArgumentList \'/c ""$path""\' '
           '-WorkingDirectory "$_zapretDir" -Verb RunAs'
     ]);
     return 'Запуск: $configName (UAC)';
@@ -74,10 +91,13 @@ class ZapretService {
   Future<String> stop() async {
     await Process.run('powershell', [
       '-Command',
-      'Start-Process -FilePath "taskkill" -ArgumentList "/F /IM winws.exe" -Verb RunAs -WindowStyle Hidden'
+      'Start-Process -FilePath "taskkill" '
+          '-ArgumentList "/F /IM winws.exe" -Verb RunAs -WindowStyle Hidden'
     ]);
     return 'Остановка: winws.exe завершён';
   }
+
+  // ── применение фильтров (Game / IPSet) ────────────────────────
 
   Future<void> applySettings({
     required String folder,
@@ -95,14 +115,18 @@ class ZapretService {
     } catch (_) {}
   }
 
+  // ── автозапуск через schtasks ─────────────────────────────────
+
   Future<String> installService(String folder) async {
     final configs = await scanConfigs();
     if (configs.isEmpty) return 'Нет конфигов для автозапуска';
     final cfg = configs.contains('general.bat') ? 'general.bat' : configs.first;
     await Process.run('powershell', [
       '-Command',
-      'Start-Process -FilePath "schtasks" -ArgumentList \'/Create /TN "Z2-AutoStart" '
-          '/SC ONLOGON /RL HIGHEST /TR ""$folder\\$cfg"" /F\' -Verb RunAs -WindowStyle Hidden'
+      'Start-Process -FilePath "schtasks" '
+          '-ArgumentList \'/Create /TN "Z2-AutoStart" '
+          '/SC ONLOGON /RL HIGHEST /TR ""$folder\\$cfg"" /F\' '
+          '-Verb RunAs -WindowStyle Hidden'
     ]);
     return 'Автозапуск установлен: $cfg';
   }
@@ -110,16 +134,20 @@ class ZapretService {
   Future<String> removeService(String folder) async {
     await Process.run('powershell', [
       '-Command',
-      'Start-Process -FilePath "schtasks" -ArgumentList \'/Delete /TN "Z2-AutoStart" /F\' '
+      'Start-Process -FilePath "schtasks" '
+          '-ArgumentList \'/Delete /TN "Z2-AutoStart" /F\' '
           '-Verb RunAs -WindowStyle Hidden'
     ]);
     return 'Автозапуск удалён';
   }
 
+  // ── обновление IPSet ──────────────────────────────────────────
+
   Future<String> updateIpset(String folder) async {
     try {
       await Directory('$folder\\lists').create(recursive: true);
-      final client = HttpClient()..connectionTimeout = const Duration(seconds: 10);
+      final client = HttpClient()
+        ..connectionTimeout = const Duration(seconds: 10);
       final req = await client.getUrl(Uri.parse(
           'https://raw.githubusercontent.com/Flowseal/zapret-discord-youtube/refs/heads/main/.service/ipset-service.txt'));
       req.headers.set('User-Agent', 'Z2-Mini');
@@ -133,34 +161,56 @@ class ZapretService {
       }
       client.close();
       return 'IPSet: ошибка HTTP ${resp.statusCode}';
-    } catch (e) { return 'IPSet: $e'; }
+    } catch (e) {
+      return 'IPSet: $e';
+    }
   }
+
+  // ── проверка обновлений приложения (Z2 Manager / Mini) ────────
 
   Future<String> checkAppUpdate() async {
     try {
-      final client = HttpClient()..connectionTimeout = const Duration(seconds: 10);
-      final req = await client.getUrl(Uri.parse('https://api.github.com/repos/Ank01rd/ZapretManager/releases/latest'));
+      final client = HttpClient()
+        ..connectionTimeout = const Duration(seconds: 10);
+      final req = await client.getUrl(Uri.parse(
+          'https://api.github.com/repos/Ank01rd/ZapretManager/releases/latest'));
       req.headers.set('User-Agent', 'Z2-Mini');
       final resp = await req.close();
-      if (resp.statusCode != 200) { client.close(); return 'Ошибка HTTP: ${resp.statusCode}'; }
+      if (resp.statusCode != 200) {
+        client.close();
+        return 'Ошибка HTTP: ${resp.statusCode}';
+      }
       final data = jsonDecode(await resp.transform(utf8.decoder).join());
       client.close();
       return 'Последняя версия Z2: ${data['tag_name']}';
-    } catch (e) { return 'Ошибка: $e'; }
+    } catch (e) {
+      return 'Ошибка: $e';
+    }
   }
+
+  // ── проверка обновлений самого Zapret (Flowseal) ──────────────
 
   Future<String> checkZapretUpdate() async {
     try {
-      final client = HttpClient()..connectionTimeout = const Duration(seconds: 10);
-      final req = await client.getUrl(Uri.parse('https://api.github.com/repos/Flowseal/zapret-discord-youtube/releases/latest'));
+      final client = HttpClient()
+        ..connectionTimeout = const Duration(seconds: 10);
+      final req = await client.getUrl(Uri.parse(
+          'https://api.github.com/repos/Flowseal/zapret-discord-youtube/releases/latest'));
       req.headers.set('User-Agent', 'Z2-Mini');
       final resp = await req.close();
-      if (resp.statusCode != 200) { client.close(); return 'Ошибка HTTP: ${resp.statusCode}'; }
+      if (resp.statusCode != 200) {
+        client.close();
+        return 'Ошибка HTTP: ${resp.statusCode}';
+      }
       final data = jsonDecode(await resp.transform(utf8.decoder).join());
       client.close();
       return 'Flowseal: ${data['tag_name']}';
-    } catch (e) { return 'Ошибка: $e'; }
+    } catch (e) {
+      return 'Ошибка: $e';
+    }
   }
+
+  // ── скачивание и установка Zapret ─────────────────────────────
 
   Future<String> downloadZapret(String folder,
       {void Function(double? p, String stage)? onProgress}) async {
@@ -183,9 +233,11 @@ class ZapretService {
         }
       }
       if (url == null) return 'В релизе нет .zip';
+
       final version = '${data['tag_name']}';
       await Directory(folder).create(recursive: true);
       final zipPath = '$folder\\zapret_download.zip';
+
       final dl = await client.getUrl(Uri.parse(url));
       dl.headers.set('User-Agent', 'Z2-Mini');
       final dlResp = await dl.close();
@@ -193,6 +245,7 @@ class ZapretService {
       final sink = File(zipPath).openWrite();
       var received = 0;
       var lastPct = -1;
+
       await for (final chunk in dlResp) {
         sink.add(chunk);
         received += chunk.length;
@@ -201,7 +254,6 @@ class ZapretService {
           if (pct != lastPct) {
             lastPct = pct;
             onProgress?.call(pct / 100, 'Скачивание $version · $pct%');
-            // 🐢 100 шагов × 50 мс ≈ 5 секунд скачивания
             await Future.delayed(const Duration(milliseconds: 50));
           }
         } else {
@@ -211,6 +263,7 @@ class ZapretService {
       }
       await sink.close();
       onProgress?.call(null, 'Установка…');
+
       final unz = await Process.run('powershell', [
         '-Command',
         'Expand-Archive -LiteralPath "$zipPath" -DestinationPath "$folder" -Force'
@@ -218,16 +271,17 @@ class ZapretService {
       try {
         await File(zipPath).delete();
       } catch (_) {}
-    if (unz.exitCode != 0) return 'Ошибка распаковки';
 
-    // 📦 архив распаковался во вложенную папку (zapret-discord-youtube-x.y.z)?
-    //    Поднимаем её содержимое прямо в $folder — файлы запрета лежат
-    //    сразу в zapret_programm, без папок-матрёшек.
-    await _flatten(folder);
-    try {
-      await File('$folder\\version.txt').writeAsString(version);
-    } catch (_) {}
-    return 'Zapret $version скачан и установлен';
+      if (unz.exitCode != 0) return 'Ошибка распаковки';
+
+      // 📦 поднимаем вложенную папку релиза прямо в $folder
+      await _flatten(folder);
+
+      try {
+        await File('$folder\\version.txt').writeAsString(version);
+      } catch (_) {}
+
+      return 'Zapret $version скачан и установлен';
     } catch (e) {
       return 'Ошибка скачивания: $e';
     } finally {
@@ -235,29 +289,38 @@ class ZapretService {
     }
   }
 
-    /// Если после распаковки появилась вложенная папка релиза —
-  /// сливаем её содержимое с корнем и удаляем.
+  /// 📦 Если после распаковки появилась вложенная папка релиза
+  ///    (zapret-discord-youtube-x.y.z) — сливаем её содержимое с корнем
+  ///    и удаляем. Два прохода — на случай двойной вложенности.
   Future<void> _flatten(String dir) async {
-    final root = Directory(dir);
-    if (!await root.exists()) return;
-    if (await File('$dir\\service.bat').exists()) return; // уже плоско
-    final nested = root.listSync().whereType<Directory>().toList();
-    Directory? inner;
-    for (final d in nested) {
-      final n = d.path.replaceAll('\\', '/').split('/').last.toLowerCase();
-      if (n.startsWith('zapret-discord-youtube')) {
-        inner = d;
-        break;
+    for (var pass = 0; pass < 2; pass++) {
+      final root = Directory(dir);
+      if (!await root.exists()) return;
+
+      final nested = root
+          .listSync()
+          .whereType<Directory>()
+          .where((d) => d.path
+              .replaceAll('\\', '/')
+              .split('/')
+              .last
+              .toLowerCase()
+              .startsWith('zapret-discord-youtube'))
+          .toList();
+
+      if (nested.isEmpty) return;
+
+      for (final d in nested) {
+        await _moveInto(d, root);
+        try {
+          await d.delete(recursive: true);
+        } catch (_) {}
       }
     }
-    inner ??= (nested.length == 1) ? nested.first : null;
-    if (inner == null) return;
-    await _moveInto(inner, root);
-    try {
-      await inner.delete(recursive: true);
-    } catch (_) {}
   }
 
+  /// Рекурсивно переносит содержимое src в dst, сливая существующие
+  /// папки и заменяя файлы.
   Future<void> _moveInto(Directory src, Directory dst) async {
     for (final e in src.listSync()) {
       final name = e.path.replaceAll('\\', '/').split('/').last;

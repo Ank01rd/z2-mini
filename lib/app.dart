@@ -11,6 +11,7 @@ import 'ui/style/effects.dart';
 import 'ui/widgets/notify_bell.dart';
 import 'ui/widgets/boot_screen.dart';
 import 'services/update_service.dart';
+import 'core/notify_service.dart';
 
 class Z2MiniApp extends StatelessWidget {
   const Z2MiniApp({super.key});
@@ -90,6 +91,18 @@ class _ShellState extends State<_Shell> with TickerProviderStateMixin {
         setState(() => _switching = false);
       }
     });
+    // 🔄 тихая проверка обновлений после запуска
+    Future.delayed(const Duration(seconds: 4), _checkUpdates);
+  }
+
+  Future<void> _checkUpdates() async {
+    final c = await UpdateService.check();
+    if (c.release == null || !mounted) return; // тихо: нет обновы или ошибка
+    NotifyService.push(
+      'Доступно обновление ${c.release!.version} — тапни, чтобы установить',
+      icon: Icons.system_update_rounded,
+      onTap: () => UpdateService.startUpdate(c.release!),
+    );
   }
 
   @override

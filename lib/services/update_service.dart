@@ -1,7 +1,6 @@
 import 'dart:convert';
 import 'dart:io';
-import 'package:flutter/foundation.dart';
-import 'package:flutter/material.dart';  // ← ДОБАВЛЕНО (нужно для Icons)
+import 'package:flutter/material.dart';
 import 'package:window_manager/window_manager.dart';
 import '../core/notify_service.dart';
 
@@ -12,13 +11,19 @@ class ReleaseInfo {
   const ReleaseInfo({required this.version, required this.url, this.size = 0});
 }
 
+class UpdateCheck {
+  final ReleaseInfo? release;
+  final String? message;
+  const UpdateCheck({this.release, this.message});
+}
+
 /// 🔄 Обновления через GitHub Releases
 class UpdateService {
-  /// ⚠️ ТВОЙ РЕПОЗИТОРИЙ: 'ник/имя-репы'
+  /// ⚠️ ТВОЯ РЕПА: 'ник/имя' — должна быть PUBLIC!
   static const String repo = 'Ank01rd/z2-mini';
 
-  /// текущая версия — МЕНЯЙ при каждом релизе!
-  static const String currentVersion = '1.0.0';
+  /// текущая версия билда — МЕНЯЙ при каждом релизе!
+static const String currentVersion = '1.0.4';
 
   static bool _busy = false;
 
@@ -41,8 +46,8 @@ class UpdateService {
     return false;
   }
 
-  /// смотрим последний релиз; null = обновы нет / ошибка
-  static Future<ReleaseInfo?> check() async {
+  /// Проверка: release новее → release; иначе message (без ошибки в островок)
+  static Future<UpdateCheck> check() async {
     try {
       final client = HttpClient()
         ..connectionTimeout = const Duration(seconds: 10);
@@ -52,15 +57,19 @@ class UpdateService {
       final resp = await req.close();
       if (resp.statusCode != 200) {
         client.close();
-        return null;
+        return UpdateCheck(message:
+            'HTTP ${resp.statusCode}: репа "$repo" не найдена или приватная');
       }
       final data = jsonDecode(await resp.transform(utf8.decoder).join());
       client.close();
       final tag = '${data['tag_name']}';
-      if (!isNewer(tag, currentVersion)) return null;
+      if (!isNewer(tag, currentVersion)) {
+        return UpdateCheck(message: 'Установлена последняя версия');
+      }
       String? url;
       var size = 0;
-      for (final a in (data['assets'] as List? ?? []).cast<Map<String, dynamic>>()) {
+      for (final a
+          in (data['assets'] as List? ?? []).cast<Map<String, dynamic>>()) {
         final n = (a['name'] as String).toLowerCase();
         if (n.endsWith('.zip') && n.contains('windows')) {
           url = a['browser_download_url'] as String;
@@ -68,10 +77,14 @@ class UpdateService {
           break;
         }
       }
-      if (url == null) return null;
-      return ReleaseInfo(version: tag, url: url, size: size);
-    } catch (_) {
-      return null;
+      if (url == null) {
+        return UpdateCheck(message:
+            'В релизе $tag нет .zip (имя должно содержать "windows")');
+      }
+      return UpdateCheck(
+          release: ReleaseInfo(version: tag, url: url, size: size));
+    } catch (e) {
+      return UpdateCheck(message: 'Ошибка сети: $e');
     }
   }
 
@@ -123,7 +136,9 @@ class UpdateService {
           icon: Icons.error_outline_rounded);
     } finally {
       _busy = false;
-      try { client.close(); } catch (_) {}
+      try {
+        client.close();
+      } catch (_) {}
     }
   }
 
@@ -140,8 +155,9 @@ class UpdateService {
     }
     // если в архиве была обёртка-папка — заходим в неё
     var root = Directory(src);
-    final hasExe =
-        root.listSync().any((e) => e is File && e.path.toLowerCase().endsWith('.exe'));
+    final hasExe = root
+        .listSync()
+        .any((e) => e is File && e.path.toLowerCase().endsWith('.exe'));
     if (!hasExe) {
       final inner = root.listSync().whereType<Directory>().toList();
       if (inner.length == 1) root = inner.first;
@@ -154,12 +170,16 @@ chcp 65001 >nul
 timeout /t 2 /nobreak >nul
 taskkill /F /IM z2_mini.exe >nul 2>&1
 timeout /t 1 /nobreak >nul
-xcopy /E /Y "${root.path}\\*" "$_exeDir\\" >nul
+xcopy /E /Y /I "${root.path}\\*" "$_exeDir" >nul
 start "" "$_exeDir\\z2_mini.exe"
 rmdir /S /Q "$workDir"
 ''');
-    // запускаем обновлятор отдельно и выходим
-    await Process.run('cmd', ['/c', 'start /min "Z2Update" "$bat"']);
+    // ✅ как в профе: PowerShell Start-Process, скрытое окно,
+    //    отдельное дерево процессов — никаких диалогов «не найдено»
+    await Process.run('powershell', [
+      '-Command',
+      'Start-Process -FilePath "cmd.exe" -ArgumentList \'/c "$bat"\' -WindowStyle Hidden'
+    ]);
     await windowManager.destroy();
   }
 }

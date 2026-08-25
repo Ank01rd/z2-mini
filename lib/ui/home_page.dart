@@ -5,6 +5,7 @@ import '../core/app_theme.dart';
 import '../core/ui_scale.dart';
 import '../core/ui_settings.dart';
 import '../services/zapret_service.dart';
+import '../services/update_service.dart';
 import 'liquid_glass_container.dart';
 import 'style/widgets.dart';
 import '../core/sound_service.dart';
@@ -489,10 +490,20 @@ class _HomePageState extends State<HomePage> {
           'Start-Process notepad -ArgumentList \'C:\\Windows\\System32\\drivers\\etc\\hosts\' -Verb RunAs']);
         ToastService.show(tr('Hosts открыт', 'Hosts opened'), Icons.fact_check_rounded);
       }),
-      _act(tr('Обновления ПО', 'Software Updates'), Icons.new_releases_rounded, () async {
-        final r = await _zapret.checkAppUpdate();
-        ToastService.show(r, Icons.new_releases_rounded);
-      }),
+_act(tr('Обновления ПО', 'Software Updates'), Icons.new_releases_rounded, () async {
+  final c = await UpdateService.check();
+  if (c.release != null) {
+    NotifyService.push(
+      'Доступно обновление ${c.release!.version} — тапни, чтобы установить',
+      icon: Icons.system_update_rounded,
+      onTap: () => UpdateService.startUpdate(c.release!),
+    );
+  } else {
+    ToastService.show(
+        c.message ?? tr('Обновлений нет', 'No updates'),
+        Icons.new_releases_rounded);
+  }
+}),
       _act(tr('Обновления Zapret', 'Zapret Updates'), Icons.cloud_rounded, () async {
         final r = await _zapret.checkZapretUpdate();
         ToastService.show(r, Icons.cloud_rounded);
