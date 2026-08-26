@@ -28,29 +28,44 @@ class _AnimatedRevealState extends State<AnimatedReveal>
   }
 
   @override
-  void dispose() { _c.dispose(); super.dispose(); }
+  void dispose() {
+    _c.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
     final cur = CurvedAnimation(parent: _c, curve: Curves.easeOutCubic);
-    return FadeTransition(opacity: cur,
+    return FadeTransition(
+      opacity: cur,
       child: SlideTransition(
-        position: Tween<Offset>(begin: const Offset(0, 0.1), end: Offset.zero).animate(cur),
+        position: Tween<Offset>(
+                begin: const Offset(0, 0.1), end: Offset.zero)
+            .animate(cur),
         child: ScaleTransition(
           scale: Tween<double>(begin: 0.92, end: 1).animate(cur),
-          child: widget.child)));
+          child: widget.child,
+        ),
+      ),
+    );
   }
 }
 
-// 🔘 2.5D-кнопка с мягкими тенями (из оригинала)
+// 🔘 2.5D-кнопка с мягкими тенями
 class Btn25D extends StatefulWidget {
   final Widget child;
   final VoidCallback? onTap;
   final double radius;
   final Color base;
   final EdgeInsets padding;
-  const Btn25D({super.key, required this.child, this.onTap, this.radius = 14,
-    required this.base, this.padding = const EdgeInsets.all(10)});
+  const Btn25D({
+    super.key,
+    required this.child,
+    this.onTap,
+    this.radius = 14,
+    required this.base,
+    this.padding = const EdgeInsets.all(10),
+  });
   @override
   State<Btn25D> createState() => _Btn25DState();
 }
@@ -61,10 +76,12 @@ class _Btn25DState extends State<Btn25D> {
   Widget build(BuildContext context) {
     final s = UiScale.value;
     final r = widget.radius >= 999 ? widget.radius : widget.radius * s;
-        final _g2 = UiSettings.gradientAccent.value
-        ? Color.lerp(widget.base,
-            UiSettings.accent2.value ?? const Color(0xFF22D3EE), 0.7)!
-        : widget.base;
+    // 🎨 «Цвет кнопок» из настроек применяется ко ВСЕМ кнопкам
+    final base = UiSettings.buttonColor.value ?? widget.base;
+    final g2 = UiSettings.gradientAccent.value
+        ? Color.lerp(
+            base, UiSettings.accent2.value ?? const Color(0xFF22D3EE), 0.7)!
+        : base;
     return MouseRegion(
       onEnter: (_) => setState(() => hovered = true),
       onExit: (_) => setState(() => hovered = false),
@@ -84,32 +101,56 @@ class _Btn25DState extends State<Btn25D> {
             duration: const Duration(milliseconds: 200),
             padding: widget.padding.scaleBy(s),
             decoration: BoxDecoration(
-              gradient: LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter,
+              gradient: LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
                 colors: pressed
-                    ? [widget.base.withOpacity(0.55), _g2.withOpacity(0.75)]
-                    : [widget.base.withOpacity(0.95), _g2.withOpacity(0.65)]),
+                    ? [base.withOpacity(0.55), g2.withOpacity(0.75)]
+                    : [base.withOpacity(0.95), g2.withOpacity(0.65)],
+              ),
               borderRadius: BorderRadius.circular(r),
               border: Border.all(
-                  color: Colors.white.withOpacity(pressed ? 0.05 : (hovered ? 0.28 : 0.14))),
-                boxShadow: (pressed || !UiSettings.cardShadows.value || UiSettings.ecoMode.value) ? [] : [
-                BoxShadow(color: Colors.black.withOpacity(0.22),
-                    blurRadius: hovered ? 9 : 5, offset: Offset(0, hovered ? 3 : 2)),
-                BoxShadow(color: Colors.white.withOpacity(0.05), blurRadius: 1,
-                    offset: const Offset(0, -1)),
-              ]),
-            child: widget.child))),
+                color: Colors.white.withOpacity(
+                    pressed ? 0.05 : (hovered ? 0.28 : 0.14)),
+              ),
+              boxShadow: (pressed ||
+                      !UiSettings.cardShadows.value ||
+                      UiSettings.ecoMode.value)
+                  ? []
+                  : [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.22),
+                        blurRadius: hovered ? 9 : 5,
+                        offset: Offset(0, hovered ? 3 : 2),
+                      ),
+                      BoxShadow(
+                        color: Colors.white.withOpacity(0.05),
+                        blurRadius: 1,
+                        offset: const Offset(0, -1),
+                      ),
+                    ],
+            ),
+            child: widget.child,
+          ),
+        ),
+      ),
     );
   }
 }
 
-// ⭕ анимированное радио (из оригинала)
+// ⭕ анимированное радио
 class FilterRadio extends StatefulWidget {
   final String label;
   final bool selected;
   final AppTheme theme;
   final VoidCallback onTap;
-  const FilterRadio({super.key, required this.label, required this.selected,
-    required this.theme, required this.onTap});
+  const FilterRadio({
+    super.key,
+    required this.label,
+    required this.selected,
+    required this.theme,
+    required this.onTap,
+  });
   @override
   State<FilterRadio> createState() => _FilterRadioState();
 }
@@ -125,53 +166,110 @@ class _FilterRadioState extends State<FilterRadio> {
       cursor: SystemMouseCursors.click,
       child: GestureDetector(
         behavior: HitTestBehavior.opaque,
-        onTap: widget.onTap,
+        onTap: () {
+          // 🔊 радио = переключение, значит toggle, а не click
+          SoundService.toggle();
+          widget.onTap();
+        },
         child: AnimatedContainer(
-          duration: t.animDur, curve: t.animCurve,
+          duration: t.animDur,
+          curve: t.animCurve,
           margin: const EdgeInsets.symmetric(vertical: 2),
           padding: EdgeInsets.symmetric(horizontal: sc(9), vertical: sc(5)),
           decoration: BoxDecoration(
-            color: sel ? t.accent.withOpacity(hovered ? 0.20 : 0.13)
-                : (hovered ? Colors.white.withOpacity(t.isDark ? 0.06 : 0.35) : Colors.transparent),
+            color: sel
+                ? t.accent.withOpacity(hovered ? 0.20 : 0.13)
+                : (hovered
+                    ? Colors.white.withOpacity(t.isDark ? 0.06 : 0.35)
+                    : Colors.transparent),
             borderRadius: BorderRadius.circular(999),
             border: Border.all(
-              color: sel ? t.accent.withOpacity(0.55)
-                  : Colors.white.withOpacity(hovered ? (t.isDark ? 0.18 : 0.5) : 0)),
+              color: sel
+                  ? t.accent.withOpacity(0.55)
+                  : Colors.white.withOpacity(
+                      hovered ? (t.isDark ? 0.18 : 0.5) : 0,
+                    ),
+            ),
           ),
           child: Row(children: [
-            AnimatedContainer(duration: t.animDur, curve: t.animCurve,
-              width: sc(16), height: sc(16),
-              decoration: BoxDecoration(shape: BoxShape.circle,
+            AnimatedContainer(
+              duration: t.animDur,
+              curve: t.animCurve,
+              width: sc(16),
+              height: sc(16),
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
                 border: Border.all(
-                    color: sel ? t.accent : t.text.withOpacity(hovered ? 0.55 : 0.35),
-                    width: sel ? 1.6 : 1.4),
-                boxShadow: sel ? [BoxShadow(color: t.accent.withOpacity(0.35), blurRadius: 8, offset: const Offset(0, 2))] : null),
-              child: Center(child: AnimatedScale(scale: sel ? 1 : 0,
-                duration: const Duration(milliseconds: 400), curve: Curves.easeOutBack,
-                child: Container(width: sc(8), height: sc(8),
-                  decoration: BoxDecoration(shape: BoxShape.circle, color: t.accent))))),
+                  color: sel
+                      ? t.accent
+                      : t.text.withOpacity(hovered ? 0.55 : 0.35),
+                  width: sel ? 1.6 : 1.4,
+                ),
+                boxShadow: sel
+                    ? [
+                        BoxShadow(
+                          color: t.accent.withOpacity(0.35),
+                          blurRadius: 8,
+                          offset: const Offset(0, 2),
+                        )
+                      ]
+                    : null,
+              ),
+              child: Center(
+                child: AnimatedScale(
+                  scale: sel ? 1 : 0,
+                  duration: const Duration(milliseconds: 400),
+                  curve: Curves.easeOutBack,
+                  child: Container(
+                    width: sc(8),
+                    height: sc(8),
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: t.accent,
+                    ),
+                  ),
+                ),
+              ),
+            ),
             SizedBox(width: sc(8)),
-                  Expanded(
-        child: AnimatedDefaultTextStyle(duration: const Duration(milliseconds: 280),
-          style: TextStyle(fontSize: sc(12),
-            fontWeight: sel ? FontWeight.w700 : FontWeight.w500,
-            color: sel ? t.text : t.text.withOpacity(0.7)),
-          child: Text(widget.label, overflow: TextOverflow.ellipsis)),
+            Expanded(
+              child: AnimatedDefaultTextStyle(
+                duration: const Duration(milliseconds: 280),
+                style: TextStyle(
+                  fontSize: sc(12),
+                  fontWeight: sel ? FontWeight.w700 : FontWeight.w500,
+                  color: sel ? t.text : t.text.withOpacity(0.7),
+                ),
+                child: Text(widget.label, overflow: TextOverflow.ellipsis),
+              ),
+            ),
+          ]),
+        ),
       ),
-          ]))));
+    );
   }
 }
 
 // 🔔 тосты
-class _ToastData { final int id; final String text; final IconData icon; bool show;
-  _ToastData({required this.id, required this.text, required this.icon, this.show = false}); }
+class _ToastData {
+  final int id;
+  final String text;
+  final IconData icon;
+  bool show;
+  _ToastData({
+    required this.id,
+    required this.text,
+    required this.icon,
+    this.show = false,
+  });
+}
 
 class ToastService {
   static final ValueNotifier<List<_ToastData>> toasts = ValueNotifier([]);
   static int _nextId = 0;
 
   static void show(String text, IconData icon) {
-    NotifyService.push(text, icon: icon);
+    NotifyService.push(text, icon: icon); // тост = звук «Уведомление»
     final d = _ToastData(id: _nextId++, text: text, icon: icon);
     final list = [...toasts.value, d];
     if (list.length > 4) list.removeAt(0);
@@ -200,12 +298,23 @@ class ToastOverlay extends StatelessWidget {
   Widget build(BuildContext context) {
     return ValueListenableBuilder<List<_ToastData>>(
       valueListenable: ToastService.toasts,
-      builder: (ctx, list, _) => Positioned(top: sc(10), left: 0, right: 0,
-        child: IgnorePointer(child: Column(mainAxisSize: MainAxisSize.min, children: [
-          for (var i = 0; i < list.length; i++) ...[
-            if (i > 0) SizedBox(height: sc(8)),
-            _ToastPill(data: list[i]),
-          ]]))));
+      builder: (ctx, list, _) => Positioned(
+        top: sc(10),
+        left: 0,
+        right: 0,
+        child: IgnorePointer(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              for (var i = 0; i < list.length; i++) ...[
+                if (i > 0) SizedBox(height: sc(8)),
+                _ToastPill(data: list[i]),
+              ],
+            ],
+          ),
+        ),
+      ),
+    );
   }
 }
 
@@ -214,21 +323,48 @@ class _ToastPill extends StatelessWidget {
   const _ToastPill({super.key, required this.data});
   @override
   Widget build(BuildContext context) => Center(
-    child: AnimatedScale(scale: data.show ? 1 : 0.1, alignment: Alignment.topCenter,
-      duration: const Duration(milliseconds: 540),
-      curve: data.show ? Curves.easeOutBack : Curves.easeInCubic,
-      child: AnimatedOpacity(opacity: data.show ? 1 : 0,
-        duration: Duration(milliseconds: data.show ? 120 : 200),
-        child: Container(
-          padding: EdgeInsets.symmetric(horizontal: sc(16), vertical: sc(10)),
-          decoration: BoxDecoration(color: Colors.black.withOpacity(0.88),
-            borderRadius: BorderRadius.circular(sc(30)),
-            border: Border.all(color: Colors.white.withOpacity(0.2)),
-            boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.4), blurRadius: sc(16), offset: Offset(0, sc(6)))]),
-          child: Row(mainAxisSize: MainAxisSize.min, children: [
-            Icon(data.icon, color: Colors.white, size: sc(18)),
-            SizedBox(width: sc(8)),
-            Flexible(child: Text(data.text, style: TextStyle(color: Colors.white,
-                fontSize: sc(13), fontWeight: FontWeight.w600))),
-          ])))));
+        child: AnimatedScale(
+          scale: data.show ? 1 : 0.1,
+          alignment: Alignment.topCenter,
+          duration: const Duration(milliseconds: 540),
+          curve: data.show ? Curves.easeOutBack : Curves.easeInCubic,
+          child: AnimatedOpacity(
+            opacity: data.show ? 1 : 0,
+            duration: Duration(milliseconds: data.show ? 120 : 200),
+            child: Container(
+              padding:
+                  EdgeInsets.symmetric(horizontal: sc(16), vertical: sc(10)),
+              decoration: BoxDecoration(
+                color: Colors.black.withOpacity(0.88),
+                borderRadius: BorderRadius.circular(sc(30)),
+                border: Border.all(color: Colors.white.withOpacity(0.2)),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.4),
+                    blurRadius: sc(16),
+                    offset: Offset(0, sc(6)),
+                  ),
+                ],
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(data.icon, color: Colors.white, size: sc(18)),
+                  SizedBox(width: sc(8)),
+                  Flexible(
+                    child: Text(
+                      data.text,
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: sc(13),
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      );
 }

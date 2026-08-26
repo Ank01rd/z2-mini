@@ -14,22 +14,30 @@ class SoundService {
 
   /// событие → стандартный ассет
   static const Map<String, String> _defaults = {
-    'click': 'Ui.wav',
-    'toggle': 'Ui2.wav',
-    'start': 'CRM 10.wav',
-    'stop': 'CRS 5.wav',
-    'toast': 'Ui3.mp3',
-    'notify': 'neverlose.wav',
-    'error': 'Ui2.wav',
+    'click': 'click.wav',
+    'toggle': 'click.wav',
+    'on': 'turn_on.wav',
+    'off': 'turn_off.wav',
+    'start': 'turn_on.wav',
+    'stop': 'turn_off.wav',
+    'restart': 'restart.wav',
+    'notify': 'notification.wav',
+    'update': 'notification.wav',
+    'complete': 'complete.wav',
+    'error': 'error.wav',
   };
 
   static const Map<String, String> labels = {
     'start': 'Запуск',
     'stop': 'Остановка',
+    'restart': 'Перезапуск',
     'click': 'Клик',
     'toggle': 'Переключатель',
-    'toast': 'Тост',
+    'on': 'Включение',
+    'off': 'Выключение',
     'notify': 'Уведомление',
+    'update': 'Обновление',
+    'complete': 'Готово',
     'error': 'Ошибка',
   };
 
@@ -66,6 +74,11 @@ class SoundService {
   static Future<void> toggle() => play('toggle');
   static Future<void> start() => play('start');
   static Future<void> stop() => play('stop');
+  static Future<void> restart() => play('restart');
+  static Future<void> on() => play('on');
+  static Future<void> off() => play('off');
+  static Future<void> update() => play('update');
+  static Future<void> complete() => play('complete');
   static Future<void> notify() => play('notify');
   static Future<void> error() => play('error');
 }

@@ -7,13 +7,18 @@ import '../../core/ui_settings.dart';
 
 Widget backgroundDecor(Color bg) => Container(color: bg);
 
-/// 🌌 Единый живой фон: 0=аврора, 1=волны, 2=звёзды, 3=«Моя волна».
-/// ⚡ Оптимизация: AnimationController с vsync вместо Timer + setState.
+/// 🌌 Единый живой фон: 0=аврора, 1=волны, 2=звёзды, 3=«Моя волна», 4=облака.
+/// ⚡ Оптимизация: Timer с cap FPS, пауза при скрытом окне.
 class LiveBackground extends StatefulWidget {
   final Color color;
   final double speed;
   final int style;
-  const LiveBackground({super.key, required this.color, this.speed = 1.0, this.style = 0});
+  const LiveBackground({
+    super.key,
+    required this.color,
+    this.speed = 1.0,
+    this.style = 0,
+  });
   @override
   State<LiveBackground> createState() => _LiveBackgroundState();
 }
@@ -36,7 +41,7 @@ class _LiveBackgroundState extends State<LiveBackground> {
     _timer = null;
     // 🚦 окно скрыто — не анимируем вообще
     if (!AppVisibility.visible.value) return;
-    // 🎛 кап FPS из настроек («Графика»): в эко-режиме жёстко 12
+    // 🎛 кап FPS из настроек: в эко-режиме жёстко 12
     final cap = UiSettings.ecoMode.value
         ? 12
         : UiSettings.fpsCap.value.clamp(12, 60);
@@ -73,16 +78,19 @@ class _LiveBackgroundState extends State<LiveBackground> {
                   ? _StarsPainter(_t, widget.color)
                   : widget.style == 3
                       ? _YWavePainter(_t, widget.color)
-                      : _AuroraPainter(_t, widget.color),
+                      : widget.style == 4
+                          ? _CloudsPainter(_t, widget.color)
+                          : _AuroraPainter(_t, widget.color),
         ),
       );
 }
 
-// ──  Аврора: мягкие дрейфующие пятна ─────────────────────
+// ── 🌌 Аврора: мягкие дрейфующие пятна ─────────────────────
 class _Blob {
   final int fx, fy;
   final double px, py, ax, ay, r, o;
-  const _Blob(this.fx, this.fy, this.px, this.py, this.ax, this.ay, this.r, this.o);
+  const _Blob(
+      this.fx, this.fy, this.px, this.py, this.ax, this.ay, this.r, this.o);
 }
 
 class _AuroraPainter extends CustomPainter {
@@ -108,8 +116,9 @@ class _AuroraPainter extends CustomPainter {
       final r = math.max(w, h) * b.r * (0.9 + 0.1 * math.sin(_tau * (t + b.px)));
       canvas.drawRect(
         Rect.fromLTRB(x - r, y - r, x + r, y + r),
-        Paint()..shader = ui.Gradient.radial(Offset(x, y), r,
-          [base.withOpacity(b.o), base.withOpacity(0.0)]),
+        Paint()
+          ..shader = ui.Gradient.radial(Offset(x, y), r,
+              [base.withOpacity(b.o), base.withOpacity(0.0)]),
       );
     }
   }
@@ -118,7 +127,7 @@ class _AuroraPainter extends CustomPainter {
   bool shouldRepaint(covariant _AuroraPainter old) => old.t != t;
 }
 
-// ──  Волны: три синусоиды, целые частоты = цикл без шва ──
+// ── 🌊 Волны: три синусоиды, целые частоты = цикл без шва ──
 class _WavesPainter extends CustomPainter {
   final double t;
   final Color base;
@@ -142,11 +151,14 @@ class _WavesPainter extends CustomPainter {
           path.lineTo(x, y);
         }
       }
-      canvas.drawPath(path, Paint()
-        ..style = PaintingStyle.stroke
-        ..strokeCap = StrokeCap.round
-        ..strokeWidth = 1.6 + l * 0.6
-        ..color = base.withOpacity(0.28 - 0.07 * l));
+      canvas.drawPath(
+        path,
+        Paint()
+          ..style = PaintingStyle.stroke
+          ..strokeCap = StrokeCap.round
+          ..strokeWidth = 1.6 + l * 0.6
+          ..color = base.withOpacity(0.28 - 0.07 * l),
+      );
     }
   }
 
@@ -166,20 +178,34 @@ class _StarsPainter extends CustomPainter {
   _StarsPainter(this.t, this.base);
   static const double _tau = 2 * math.pi;
   static const List<_Star> _stars = [
-    _Star(0.05, 0.10, 1.6, 0.00, 0.5), _Star(0.12, 0.42, 1.1, 0.35, 0.3),
-    _Star(0.18, 0.78, 1.8, 0.60, 0.7), _Star(0.24, 0.22, 1.0, 0.15, 0.4),
-    _Star(0.30, 0.60, 1.4, 0.80, 0.6), _Star(0.36, 0.05, 1.2, 0.45, 0.5),
-    _Star(0.42, 0.88, 1.7, 0.25, 0.8), _Star(0.48, 0.35, 1.0, 0.70, 0.3),
-    _Star(0.55, 0.65, 1.5, 0.05, 0.6), _Star(0.60, 0.15, 1.1, 0.55, 0.4),
-    _Star(0.66, 0.50, 1.9, 0.90, 0.7), _Star(0.72, 0.82, 1.0, 0.30, 0.5),
-    _Star(0.78, 0.28, 1.4, 0.65, 0.6), _Star(0.84, 0.70, 1.2, 0.10, 0.4),
-    _Star(0.90, 0.40, 1.7, 0.50, 0.8), _Star(0.95, 0.08, 1.1, 0.75, 0.3),
-    _Star(0.08, 0.92, 1.3, 0.20, 0.6), _Star(0.22, 0.55, 1.0, 0.95, 0.4),
-    _Star(0.38, 0.30, 1.6, 0.40, 0.7), _Star(0.52, 0.90, 1.1, 0.85, 0.5),
-    _Star(0.68, 0.12, 1.4, 0.55, 0.6), _Star(0.82, 0.48, 1.0, 0.35, 0.4),
-    _Star(0.93, 0.75, 1.5, 0.65, 0.7), _Star(0.15, 0.25, 1.2, 0.05, 0.5),
-    _Star(0.45, 0.55, 1.0, 0.30, 0.3), _Star(0.62, 0.38, 1.3, 0.75, 0.6),
-    _Star(0.75, 0.95, 1.1, 0.15, 0.4), _Star(0.88, 0.20, 1.6, 0.45, 0.8),
+    _Star(0.05, 0.10, 1.6, 0.00, 0.5),
+    _Star(0.12, 0.42, 1.1, 0.35, 0.3),
+    _Star(0.18, 0.78, 1.8, 0.60, 0.7),
+    _Star(0.24, 0.22, 1.0, 0.15, 0.4),
+    _Star(0.30, 0.60, 1.4, 0.80, 0.6),
+    _Star(0.36, 0.05, 1.2, 0.45, 0.5),
+    _Star(0.42, 0.88, 1.7, 0.25, 0.8),
+    _Star(0.48, 0.35, 1.0, 0.70, 0.3),
+    _Star(0.55, 0.65, 1.5, 0.05, 0.6),
+    _Star(0.60, 0.15, 1.1, 0.55, 0.4),
+    _Star(0.66, 0.50, 1.9, 0.90, 0.7),
+    _Star(0.72, 0.82, 1.0, 0.30, 0.5),
+    _Star(0.78, 0.28, 1.4, 0.65, 0.6),
+    _Star(0.84, 0.70, 1.2, 0.10, 0.4),
+    _Star(0.90, 0.40, 1.7, 0.50, 0.8),
+    _Star(0.95, 0.08, 1.1, 0.75, 0.3),
+    _Star(0.08, 0.92, 1.3, 0.20, 0.6),
+    _Star(0.22, 0.55, 1.0, 0.95, 0.4),
+    _Star(0.38, 0.30, 1.6, 0.40, 0.7),
+    _Star(0.52, 0.90, 1.1, 0.85, 0.5),
+    _Star(0.68, 0.12, 1.4, 0.55, 0.6),
+    _Star(0.82, 0.48, 1.0, 0.35, 0.4),
+    _Star(0.93, 0.75, 1.5, 0.65, 0.7),
+    _Star(0.15, 0.25, 1.2, 0.05, 0.5),
+    _Star(0.45, 0.55, 1.0, 0.30, 0.3),
+    _Star(0.62, 0.38, 1.3, 0.75, 0.6),
+    _Star(0.75, 0.95, 1.1, 0.15, 0.4),
+    _Star(0.88, 0.20, 1.6, 0.45, 0.8),
   ];
 
   @override
@@ -191,12 +217,69 @@ class _StarsPainter extends CustomPainter {
       final tw = 0.5 + 0.5 * math.sin(_tau * (t * 2 + s.p));
       final o = 0.10 + 0.45 * tw;
       final r = s.s * (0.8 + 0.4 * tw);
-      canvas.drawCircle(Offset(s.x * w, y * h), r, Paint()..color = base.withOpacity(o));
+      canvas.drawCircle(Offset(s.x * w, y * h), r,
+          Paint()..color = base.withOpacity(o));
     }
   }
 
   @override
   bool shouldRepaint(covariant _StarsPainter old) => old.t != t;
+}
+
+// ── ☁️ Облака: силуэты-иконки плывут ВЛЕВО ───────────
+class _Cloud {
+  final double y, s, p, o;
+  const _Cloud(this.y, this.s, this.p, this.o);
+}
+
+class _CloudsPainter extends CustomPainter {
+  final double t;
+  final Color base;
+  _CloudsPainter(this.t, this.base);
+
+  static const List<_Cloud> _clouds = [
+    _Cloud(0.10, 1.30, 0.05, 0.10),
+    _Cloud(0.28, 0.80, 0.42, 0.07),
+    _Cloud(0.46, 1.60, 0.68, 0.12),
+    _Cloud(0.63, 0.70, 0.22, 0.06),
+    _Cloud(0.80, 1.10, 0.55, 0.09),
+  ];
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final w = size.width, h = size.height;
+    if (w <= 0 || h <= 0) return;
+    final tint = Color.lerp(Colors.white, base, 0.2)!;
+    for (final c in _clouds) {
+      final s = w * 0.16 * c.s; // масштаб облака
+      final cw = s * 1.6; // его ширина
+      final travel = w + cw * 2;
+      double x = (c.p - t) % 1.0; // дрейф ВЛЕВО, цикл без шва
+      if (x < 0) x += 1.0;
+      final cx = x * travel - cw;
+      final cy = h * c.y;
+      canvas.drawPath(
+        _cloud(cx, cy, s),
+        Paint()
+          ..color = tint.withOpacity(c.o)
+          ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 1.5),
+      );
+    }
+  }
+
+  Path _cloud(double x, double y, double s) {
+    return Path()
+      ..addRRect(RRect.fromRectAndRadius(
+          Rect.fromLTWH(x, y, s * 1.6, s * 0.5),
+          Radius.circular(s * 0.25)))
+      ..addOval(Rect.fromCircle(
+          center: Offset(x + s * 0.55, y - s * 0.05), radius: s * 0.32))
+      ..addOval(Rect.fromCircle(
+          center: Offset(x + s * 1.0, y + s * 0.02), radius: s * 0.22));
+  }
+
+  @override
+  bool shouldRepaint(covariant _CloudsPainter old) => old.t != t;
 }
 
 // ── 🎵 «Моя волна» как в Яндекс Музыке ────────────
@@ -248,7 +331,8 @@ class _YWavePainter extends CustomPainter {
       final life = (t * (1 + i % 3) + i * 0.618) % 1.0;
       final vis = math.sin(math.pi * life);
       if (vis < 0.06) continue;
-      final a = _tau * (i / 9) + i * 0.9 + 0.5 * math.sin(_tau * (t + i * 0.37));
+      final a =
+          _tau * (i / 9) + i * 0.9 + 0.5 * math.sin(_tau * (t + i * 0.37));
       final r0 = R * (0.25 + 0.10 * math.sin(_tau * 2 * t + i));
       final len = m * (0.12 + 0.30 * vis) * (0.7 + 0.3 * math.sin(i * 2.3));
       final r1 = r0 + len;
@@ -282,29 +366,42 @@ class _YWavePainter extends CustomPainter {
     canvas.drawPath(
       _blob(cx, cy, R, 1.15),
       Paint()
-        ..shader = ui.Gradient.radial(Offset(cx, cy), R * 1.35,
-          [core.withOpacity(0.45), base.withOpacity(0.28), base.withOpacity(0.0)],
-          [0.0, 0.45, 1.0]),
+        ..shader = ui.Gradient.radial(Offset(cx, cy), R * 1.35, [
+          core.withOpacity(0.45),
+          base.withOpacity(0.28),
+          base.withOpacity(0.0)
+        ], [
+          0.0,
+          0.45,
+          1.0
+        ]),
     );
 
     // ── 2) деформирующийся силуэт облака ─────────────────────
     canvas.drawPath(
       _blob(cx, cy, R, 0.92),
       Paint()
-        ..shader = ui.Gradient.radial(Offset(cx, cy), R * 1.1,
-          [core.withOpacity(0.55), base.withOpacity(0.30), base.withOpacity(0.0)],
-          [0.0, 0.6, 1.0]),
+        ..shader = ui.Gradient.radial(Offset(cx, cy), R * 1.1, [
+          core.withOpacity(0.55),
+          base.withOpacity(0.30),
+          base.withOpacity(0.0)
+        ], [
+          0.0,
+          0.6,
+          1.0
+        ]),
     );
 
     // ── 3) яркое ядро ────────────────────────────────────────
     canvas.drawPath(
       _blob(cx, cy, R * 0.55, 1.0),
       Paint()
-        ..shader = ui.Gradient.radial(Offset(cx, cy), R * 0.75,
-          [core.withOpacity(0.50), core.withOpacity(0.0)]),
+        ..shader = ui.Gradient.radial(
+            Offset(cx, cy), R * 0.75, [core.withOpacity(0.50), core.withOpacity(0.0)]),
     );
   }
 
   @override
-  bool shouldRepaint(covariant _YWavePainter old) => old.t != t || old.base != base;
+  bool shouldRepaint(covariant _YWavePainter old) =>
+      old.t != t || old.base != base;
 }

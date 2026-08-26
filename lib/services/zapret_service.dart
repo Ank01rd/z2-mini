@@ -117,10 +117,12 @@ class ZapretService {
 
   // ── автозапуск через schtasks ─────────────────────────────────
 
-  Future<String> installService(String folder) async {
+  Future<String> installService(String folder, {String? config}) async {
     final configs = await scanConfigs();
     if (configs.isEmpty) return 'Нет конфигов для автозапуска';
-    final cfg = configs.contains('general.bat') ? 'general.bat' : configs.first;
+    final cfg = (config != null && configs.contains(config))
+        ? config
+        : (configs.contains('general.bat') ? 'general.bat' : configs.first);
     await Process.run('powershell', [
       '-Command',
       'Start-Process -FilePath "schtasks" '

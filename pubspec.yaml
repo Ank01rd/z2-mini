@@ -20,6 +20,7 @@ dependencies:
 flutter:
   uses-material-design: true
   assets:
+    - assets/
     - assets/lock.ico
     - assets/unlock.ico
     - assets/CRM 10.wav

@@ -67,7 +67,7 @@ class _HomePageState extends State<HomePage> {
     });
   }
 
-  Future<void> _start() async {
+  Future<void> _start({bool silent = false}) async {
     final sel = UiSettings.selectedConfig.value;
     if (sel == null) {
       ToastService.show(tr('Не выбран конфиг', 'No config'), Icons.error_outline_rounded);
@@ -81,7 +81,7 @@ class _HomePageState extends State<HomePage> {
     await _zapret.start(sel);
     // 🔊 сначала звук запуска, потом ТИХИЙ тост —
     //    иначе notify от тоста обрывает звук старта
-    SoundService.start();
+    if (!silent) SoundService.start();
     NotifyService.push(tr('Zapret активен', 'Zapret active'),
         icon: Icons.rocket_launch_rounded, sound: false);
     // ⚡ Оптимизация: ретрай статус вместо слепой задержки
@@ -102,9 +102,9 @@ class _HomePageState extends State<HomePage> {
     if (mounted) setState(() => _busy = false);
   }
 
-  Future<void> _stop() async {
+  Future<void> _stop({bool silent = false}) async {
     await _zapret.stop();
-    SoundService.stop();
+    if (!silent) SoundService.stop();
     NotifyService.push(tr('Остановлен', 'Stopped'),
         icon: Icons.stop_circle_rounded, sound: false);
     for (var i = 0; i < 5; i++) {
@@ -116,9 +116,10 @@ class _HomePageState extends State<HomePage> {
   }
 
   Future<void> _restart() async {
-    await _stop();
+    await _stop(silent: true);
+    SoundService.restart(); // 🔊 свой звук перезапуска, а не stop+start
     await Future.delayed(const Duration(milliseconds: 500));
-    await _start();
+    await _start(silent: true);
   }
 
   String _gameSummary() {
@@ -217,7 +218,8 @@ class _HomePageState extends State<HomePage> {
                     SizedBox(height: sc(6)),
                     _btn(tr('В автозапуск', 'Add to Startup'), Icons.start_rounded,
                         () async {
-                      final r = await _zapret.installService(_zapret.zapretDir);
+                      final r = await _zapret.installService(_zapret.zapretDir,
+                          config: UiSettings.selectedConfig.value);
                       ToastService.show(r, Icons.start_rounded);
                     }),
                     SizedBox(height: sc(6)),
@@ -240,7 +242,10 @@ class _HomePageState extends State<HomePage> {
           cursor: SystemMouseCursors.click,
           child: GestureDetector(
             behavior: HitTestBehavior.opaque,
-            onTap: () => setState(() => _cfgOpen = !_cfgOpen),
+            onTap: () {
+              SoundService.toggle();
+              setState(() => _cfgOpen = !_cfgOpen);
+            },
             child: Padding(
               padding: EdgeInsets.symmetric(horizontal: sc(4), vertical: sc(4)),
               child: Row(children: [
@@ -276,18 +281,10 @@ class _HomePageState extends State<HomePage> {
   Widget _configListBody() => Padding(
         padding: EdgeInsets.only(bottom: sc(6)),
         child: Column(children: [
-          SizedBox(
-            height: sc(24),
-            child: ListView(
-              scrollDirection: Axis.horizontal,
-              padding: EdgeInsets.zero,
-              children: [
-                for (final c in _cfgCats) ...[
-                  _catChip(c[0], c[1]),
-                  SizedBox(width: sc(6)),
-                ],
-              ],
-            ),
+          Wrap(
+            spacing: sc(6),
+            runSpacing: sc(6),
+            children: [for (final c in _cfgCats) _catChip(c[0], c[1])],
           ),
           SizedBox(height: sc(6)),
           ConstrainedBox(
@@ -346,7 +343,10 @@ class _HomePageState extends State<HomePage> {
     final active = _cfgFilter == id;
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
-      onTap: () => setState(() => _cfgFilter = id),
+      onTap: () {
+        SoundService.toggle();
+        setState(() => _cfgFilter = id);
+      },
       child: AnimatedContainer(
         duration: t.animDur,
         curve: t.animCurve,
@@ -399,7 +399,10 @@ class _HomePageState extends State<HomePage> {
         icon: Icons.sports_esports_rounded,
         summary: _gameSummary(),
         open: _gameOpen,
-        onToggle: () => setState(() => _gameOpen = !_gameOpen),
+        onToggle: () {
+          SoundService.toggle();
+          setState(() => _gameOpen = !_gameOpen);
+        },
         children: [
           FilterRadio(label: tr('Отключено', 'Disabled'), selected: _gameFilter == 'disabled', theme: t,
             onTap: () => setState(() => _gameFilter = 'disabled')),
@@ -420,7 +423,10 @@ class _HomePageState extends State<HomePage> {
         icon: Icons.language_rounded,
         summary: _ipsetSummary(),
         open: _ipsetOpen,
-        onToggle: () => setState(() => _ipsetOpen = !_ipsetOpen),
+        onToggle: () {
+          SoundService.toggle();
+          setState(() => _ipsetOpen = !_ipsetOpen);
+        },
         children: [
           FilterRadio(label: tr('Отключено', 'Disabled'), selected: _ipsetFilter == 'disabled', theme: t,
             onTap: () => setState(() => _ipsetFilter = 'disabled')),
@@ -487,7 +493,9 @@ class _HomePageState extends State<HomePage> {
       _act(tr('Тесты', 'Tests'), Icons.speed_rounded, _tests),
       _act(tr('Обновить IPSet', 'Update IPSet'), Icons.cached_rounded, () async {
         final r = await _zapret.updateIpset(_zapret.zapretDir);
-        ToastService.show(r, Icons.cached_rounded);
+        NotifyService.push(r,
+            icon: Icons.cached_rounded,
+            soundEvent: r.startsWith('IPSet: ошибка') ? 'error' : 'complete');
       }),
       _act(tr('Проверить Hosts', 'Check Hosts'), Icons.fact_check_rounded, () async {
         await Process.run('powershell', ['-Command',
@@ -500,6 +508,7 @@ _act(tr('Обновления ПО', 'Software Updates'), Icons.new_releases_rou
     NotifyService.push(
       'Доступно обновление ${c.release!.version} — тапни, чтобы установить',
       icon: Icons.system_update_rounded,
+      soundEvent: 'update',
       onTap: () => UpdateService.startUpdate(c.release!),
     );
   } else {
@@ -539,7 +548,10 @@ _act(tr('Обновления ПО', 'Software Updates'), Icons.new_releases_rou
         NotifyService.push(stage,
           icon: Icons.download_rounded, sound: false, progress: p);
       });
-    NotifyService.push(r, icon: Icons.download_rounded);
+    // 🔊 успех → «Готово», неудача → «Ошибка»
+    NotifyService.push(r,
+        icon: Icons.download_rounded,
+        soundEvent: r.startsWith('Ошибка') ? 'error' : 'complete');
     await _refresh();
   }
 

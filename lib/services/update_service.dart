@@ -23,7 +23,7 @@ class UpdateService {
   static const String repo = 'Ank01rd/z2-mini';
 
   /// текущая версия билда — МЕНЯЙ при каждом релизе!
-static const String currentVersion = '1.0.1';
+static const String currentVersion = '1.1.0';
 
   static bool _busy = false;
 
@@ -128,8 +128,8 @@ static const String currentVersion = '1.0.1';
       await sink.close();
       client.close();
 
-      NotifyService.push('Установка обновления…',
-          icon: Icons.system_update_rounded, sound: false);
+      NotifyService.push('Обновление скачано — установка…',
+          icon: Icons.system_update_rounded, soundEvent: 'complete');
       await _install(zipPath, dir.path);
     } catch (e) {
       NotifyService.push('Ошибка обновления: $e',

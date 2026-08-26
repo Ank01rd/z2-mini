@@ -34,6 +34,7 @@ class NotifyService {
     IconData icon = Icons.notifications_active_rounded,
     List<NotifyLine>? lines,
     bool sound = true,
+    String? soundEvent,
     double? progress,
     VoidCallback? onTap,
   }) {
@@ -47,8 +48,15 @@ class NotifyService {
     _timer?.cancel();
     if (progress == null) {
       if (sound) {
+        // 🎯 каждое уведомление — своим событием:
+        //    ошибки → 'error', остальное → 'notify' (или soundEvent)
+        final ev = soundEvent ??
+            (icon == Icons.error_outline_rounded ||
+                    text.toLowerCase().startsWith('ошиб')
+                ? 'error'
+                : 'notify');
         Future.delayed(Duration(milliseconds: lines != null ? 250 : 0),
-            () => SoundService.notify());
+            () => SoundService.play(ev));
       }
       _timer = Timer(
         Duration(

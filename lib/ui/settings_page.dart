@@ -12,7 +12,7 @@ import 'package:file_picker/file_picker.dart';
 import '../core/sound_service.dart';
 import '../core/notify_service.dart';
 import '../services/zapret_service.dart';
-import '../services/update_service.dart';  // ← ДОБАВЛЕНО
+import '../services/update_service.dart';
 import 'package:window_manager/window_manager.dart';
 
 class SettingsPage extends StatefulWidget {
@@ -24,8 +24,8 @@ class SettingsPage extends StatefulWidget {
 
 class _SettingsPageState extends State<SettingsPage>
     with SingleTickerProviderStateMixin {
-  int _cat = 0;
-  int _shown = 0;
+  static int _cat = 0; // 🧯 static: не сбрасывается при пересоздании страницы
+  static int _shown = 0;
   double _offsetY = 0;
   double _contentOp = 1;
   Duration _slideDur = Duration.zero;
@@ -103,41 +103,46 @@ class _SettingsPageState extends State<SettingsPage>
 
   @override
   Widget build(BuildContext context) {
-    return AnimatedBuilder(animation: UiSettings.all, builder: (ctx, _) {
-      return Row(children: [
-        SlideTransition(
-          position: Tween<Offset>(begin: const Offset(-0.25, 0), end: Offset.zero)
-              .animate(_enterCurve),
-          child: FadeTransition(opacity: _enterCurve, child: _rail()),
-        ),
-        VerticalDivider(
-            width: 1, color: Colors.white.withOpacity(t.isDark ? 0.08 : 0.3)),
-        Expanded(
-          child: SlideTransition(
-            position: Tween<Offset>(begin: const Offset(0.08, 0), end: Offset.zero)
-                .animate(_enterCurve),
-            child: FadeTransition(
-              opacity: _enterCurve,
-              child: Padding(
-                padding: EdgeInsets.fromLTRB(sc(16), sc(44), sc(64), sc(16)),
-                child: Center(
-                  child: ClipRect(
-                    child: AnimatedSlide(
-                      offset: Offset(0, _offsetY),
-                      duration: _slideDur,
-                      curve: _slideCurve,
-                      child: AnimatedOpacity(
-                        opacity: _contentOp,
+    return AnimatedBuilder(
+      animation: UiSettings.all,
+      builder: (ctx, _) {
+        return Row(children: [
+          SlideTransition(
+            position:
+                Tween<Offset>(begin: const Offset(-0.25, 0), end: Offset.zero)
+                    .animate(_enterCurve),
+            child: FadeTransition(opacity: _enterCurve, child: _rail()),
+          ),
+          VerticalDivider(
+              width: 1, color: Colors.white.withOpacity(t.isDark ? 0.08 : 0.3)),
+          Expanded(
+            child: SlideTransition(
+              position: Tween<Offset>(
+                      begin: const Offset(0.08, 0), end: Offset.zero)
+                  .animate(_enterCurve),
+              child: FadeTransition(
+                opacity: _enterCurve,
+                child: Padding(
+                  padding: EdgeInsets.fromLTRB(sc(16), sc(44), sc(64), sc(16)),
+                  child: Center(
+                    child: ClipRect(
+                      child: AnimatedSlide(
+                        offset: Offset(0, _offsetY),
                         duration: _slideDur,
                         curve: _slideCurve,
-                        child: LiquidGlassContainer(
-                          theme: t,
-                          radius: 24,
-                          child: SingleChildScrollView(
-                            padding: EdgeInsets.all(sc(14)),
-                            child: KeyedSubtree(
-                              key: ValueKey(_shown),
-                              child: _page(_shown),
+                        child: AnimatedOpacity(
+                          opacity: _contentOp,
+                          duration: _slideDur,
+                          curve: _slideCurve,
+                          child: LiquidGlassContainer(
+                            theme: t,
+                            radius: 24,
+                            child: SingleChildScrollView(
+                              padding: EdgeInsets.all(sc(14)),
+                              child: KeyedSubtree(
+                                key: ValueKey(_shown),
+                                child: _page(_shown),
+                              ),
                             ),
                           ),
                         ),
@@ -148,9 +153,9 @@ class _SettingsPageState extends State<SettingsPage>
               ),
             ),
           ),
-        ),
-      ]);
-    });
+        ]);
+      },
+    );
   }
 
   Widget _rail() => ClipRect(
@@ -187,21 +192,32 @@ class _SettingsPageState extends State<SettingsPage>
 
   Widget _page(int i) {
     switch (i) {
-      case 0: return _appearance();
-      case 1: return _interface();
-      case 2: return _glass();
-      case 3: return _glow();
-      case 4: return _sound();
-      case 5: return _background();
-      case 6: return _graphics();
-      default: return _about();
+      case 0:
+        return _appearance();
+      case 1:
+        return _interface();
+      case 2:
+        return _glass();
+      case 3:
+        return _glow();
+      case 4:
+        return _sound();
+      case 5:
+        return _background();
+      case 6:
+        return _graphics();
+      default:
+        return _about();
     }
   }
 
   Widget _catBtn(int i) {
     final active = _cat == i;
     return GestureDetector(
-      onTap: () => _goCat(i),
+      onTap: () {
+        SoundService.click();
+        _goCat(i);
+      },
       child: AnimatedContainer(
         duration: t.animDur,
         curve: t.animCurve,
@@ -210,7 +226,7 @@ class _SettingsPageState extends State<SettingsPage>
           color: active ? t.accent.withOpacity(0.18) : Colors.transparent,
           borderRadius: BorderRadius.circular(14),
           border: Border.all(
-            color: active ? t.accent.withOpacity(0.5) : Colors.transparent),
+              color: active ? t.accent.withOpacity(0.5) : Colors.transparent),
         ),
         child: Row(children: [
           Icon(_cats[i][0] as IconData,
@@ -231,301 +247,362 @@ class _SettingsPageState extends State<SettingsPage>
 
   // ── вкладки ────────────────────────────────────────────────
   Widget _appearance() => _col([
-    _card(title: tr('Тема', 'Theme'), icon: Icons.palette_rounded, children: [
-      _themeSwitch(),
-      _sep(),
-      _switch(tr('Авто-тема (ночью тёмная)', 'Auto theme'),
-          UiSettings.autoTheme.value, () {
-        UiSettings.autoTheme.value = !UiSettings.autoTheme.value;
-        UiSettings.save();
-      }, icon: Icons.schedule_rounded),
-    ]),
-    _gap(),
-    _card(title: tr('Цвета', 'Colors'), icon: Icons.colorize_rounded, children: [
-      _colorRow(tr('Цвет акцента', 'Accent color'),
-          UiSettings.accentColor.value ?? t.accent, (c) {
-        UiSettings.accentColor.value = c.withOpacity(1);
-        UiSettings.save();
-      }, onReset: () {
-        UiSettings.accentColor.value = null;
-        UiSettings.save();
-      }),
-      _sep(),
-      _switch(tr('Градиентный акцент', 'Gradient accent'),
-          UiSettings.gradientAccent.value, () {
-        UiSettings.gradientAccent.value = !UiSettings.gradientAccent.value;
-        UiSettings.save();
-      }, icon: Icons.gradient_rounded),
-      if (UiSettings.gradientAccent.value) ...[
-        _sep(),
-        _colorRow(tr('Второй цвет', 'Second color'),
-            UiSettings.accent2.value ?? const Color(0xFF22D3EE), (c) {
-          UiSettings.accent2.value = c.withOpacity(1);
-          UiSettings.save();
-        }, onReset: () {
-          UiSettings.accent2.value = null;
-          UiSettings.save();
-        }),
-      ],
-      _sep(),
-      _colorRow(tr('Цвет кнопок', 'Button color'),
-          UiSettings.buttonColor.value ?? t.buttonColor, (c) {
-        UiSettings.buttonColor.value = c.withOpacity(1);
-        UiSettings.save();
-      }, onReset: () {
-        UiSettings.buttonColor.value = null;
-        UiSettings.save();
-      }),
-    ]),
-  ]);
+        _card(title: tr('Тема', 'Theme'), icon: Icons.palette_rounded, children: [
+          _themeSwitch(),
+          _sep(),
+          _switch(tr('Авто-тема (ночью тёмная)', 'Auto theme'),
+              UiSettings.autoTheme.value, () {
+            UiSettings.autoTheme.value = !UiSettings.autoTheme.value;
+            UiSettings.save();
+          }, icon: Icons.schedule_rounded),
+        ]),
+        _gap(),
+        _card(
+            title: tr('Цвета', 'Colors'),
+            icon: Icons.colorize_rounded,
+            children: [
+              _colorRow(tr('Цвет акцента', 'Accent color'),
+                  UiSettings.accentColor.value ?? t.accent, (c) {
+                UiSettings.accentColor.value = c;
+                UiSettings.save();
+              }, onReset: () {
+                UiSettings.accentColor.value = null;
+                UiSettings.save();
+              }),
+              _sep(),
+              _switch(tr('Градиентный акцент', 'Gradient accent'),
+                  UiSettings.gradientAccent.value, () {
+                UiSettings.gradientAccent.value =
+                    !UiSettings.gradientAccent.value;
+                UiSettings.save();
+              }, icon: Icons.gradient_rounded),
+              if (UiSettings.gradientAccent.value) ...[
+                _sep(),
+                _colorRow(tr('Второй цвет', 'Second color'),
+                    UiSettings.accent2.value ?? const Color(0xFF22D3EE), (c) {
+                  UiSettings.accent2.value = c;
+                  UiSettings.save();
+                }, onReset: () {
+                  UiSettings.accent2.value = null;
+                  UiSettings.save();
+                }),
+              ],
+              _sep(),
+              _colorRow(tr('Цвет кнопок', 'Button color'),
+                  UiSettings.buttonColor.value ?? t.buttonColor, (c) {
+                UiSettings.buttonColor.value = c;
+                UiSettings.save();
+              }, onReset: () {
+                UiSettings.buttonColor.value = null;
+                UiSettings.save();
+              }),
+            ]),
+      ]);
 
   Widget _interface() => _col([
-    _card(
-      title: tr('Интерфейс', 'Interface'),
-      icon: Icons.dashboard_customize_rounded,
-      children: [
-        _slider(tr('Масштаб', 'Scale'), UiSettings.uiScale.value, 0.7, 1.6, (v) {
-          UiSettings.uiScale.value = v;
-          UiScale.value = v;
-          UiSettings.save();
-        }, suffix: '${(UiSettings.uiScale.value * 100).toInt()}%'),
-        _sep(),
-        _slider(tr('Скругление', 'Radius'), UiSettings.glassRadius.value, 8, 48, (v) {
-          UiSettings.glassRadius.value = v;
-          UiSettings.save();
-        }),
-        _sep(),
-        _switch(tr('Сайдбар справа', 'Sidebar right'),
-            UiSettings.sidebarRight.value, () {
-          UiSettings.sidebarRight.value = !UiSettings.sidebarRight.value;
-          UiSettings.save();
-        }, icon: Icons.flip_to_front_rounded),
-        _sep(),
-        Row(children: [
-          _chip(tr('Системный шрифт', 'System'),
-              UiSettings.fontMode.value == 0, () {
-            UiSettings.fontMode.value = 0;
-            UiSettings.save();
-          }),
-          SizedBox(width: sc(8)),
-          _chip(tr('Моно', 'Mono'), UiSettings.fontMode.value == 1, () {
-            UiSettings.fontMode.value = 1;
-            UiSettings.save();
-          }),
-        ]),
-      ],
-    ),
-    _gap(),
-    _card(title: tr('Запуск', 'Startup'), icon: Icons.rocket_launch_rounded, children: [
-      _switch(tr('Бут-анимация', 'Boot animation'),
-          UiSettings.bootEnabled.value, () {
-        UiSettings.bootEnabled.value = !UiSettings.bootEnabled.value;
-        UiSettings.save();
-      }, icon: Icons.play_circle_outline_rounded),
-      _sep(),
-      _slider(tr('Длительность бут', 'Boot duration'),
-          UiSettings.bootDuration.value, 2.0, 6.0, (v) {
-        UiSettings.bootDuration.value = v;
-        UiSettings.save();
-      }, suffix: '${UiSettings.bootDuration.value.toStringAsFixed(1)}s'),
-      _sep(),
-      Container(
-        decoration: BoxDecoration(
-          color: Colors.black.withOpacity(t.isDark ? 0.35 : 0.06),
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: t.accent.withOpacity(0.4)),
-        ),
-        child: TextField(
-          controller: TextEditingController(text: UiSettings.bootCaption.value),
-          onSubmitted: (s) {
-            UiSettings.bootCaption.value = s;
-            UiSettings.save();
-          },
-          style: TextStyle(color: t.text, fontSize: 12),
-          decoration: InputDecoration(
-            isDense: true,
-            border: InputBorder.none,
-            prefixIcon: Icon(Icons.title_rounded, size: 14, color: t.accent),
-            hintText: tr('Подпись на бут-экране (пусто = стандарт)',
-                'Boot caption (empty = default)'),
-            hintStyle: TextStyle(color: t.text.withOpacity(0.35), fontSize: 11),
-            contentPadding: EdgeInsets.symmetric(horizontal: sc(10), vertical: sc(10)),
-          ),
-        ),
-      ),
-    ]),
-    _gap(),
-    _card(
-      title: tr('Поведение', 'Behaviour'),
-      icon: Icons.tune_rounded,
-      children: [
-        _slider(tr('Скорость анимаций', 'Animation speed'),
-            UiSettings.animSpeed.value, 0.5, 2.0, (v) {
-          UiSettings.animSpeed.value = v;
-          UiSettings.save();
-        }, suffix: 'x${UiSettings.animSpeed.value.toStringAsFixed(1)}'),
-        _sep(),
-        _switch(tr('Анимации', 'Animations'),
-            UiSettings.animationsEnabled.value, () {
-          UiSettings.animationsEnabled.value = !UiSettings.animationsEnabled.value;
-          UiSettings.save();
-        }, icon: Icons.animation_rounded),
-      ],
-    ),
-  ]);
-
-  Widget _glass() => _col([
-    _card(title: tr('Размытие', 'Blur'), icon: Icons.water_drop_rounded, children: [
-      _switch(tr('Реальный blur (GPU)', 'Real blur (GPU)'),
-          UiSettings.realBlur.value, () {
-        UiSettings.realBlur.value = !UiSettings.realBlur.value;
-        UiSettings.save();
-      }, icon: Icons.blur_on_rounded),
-      _sep(),
-      _slider(tr('Размытие', 'Blur'), UiSettings.blurSigma.value, 0, 50, (v) {
-        UiSettings.blurSigma.value = v;
-        UiSettings.save();
-      }),
-      _sep(),
-      _slider(tr('Насыщенность', 'Saturation'), UiSettings.saturation.value, 1.0, 2.0, (v) {
-        UiSettings.saturation.value = v;
-        UiSettings.save();
-      }, suffix: UiSettings.saturation.value.toStringAsFixed(2)),
-      _sep(),
-      _slider(tr('Прозрачность', 'Opacity'), UiSettings.glassOpacity.value, 0.0, 0.8, (v) {
-        UiSettings.glassOpacity.value = v;
-        UiSettings.save();
-      }, suffix: UiSettings.glassOpacity.value.toStringAsFixed(2)),
-    ]),
-    _gap(),
-    _card(title: tr('Оттенок', 'Tint'), icon: Icons.colorize_rounded, children: [
-      _colorRow(tr('Оттенок стекла', 'Glass tint'), UiSettings.glassTint.value, (c) {
-        UiSettings.glassTint.value = c;
-        UiSettings.save();
-      }),
-      _sep(),
-      Btn25D(
-        base: t.accent,
-        radius: 999,
-        onTap: () => UiSettings.resetGlass(),
-        padding: EdgeInsets.symmetric(vertical: sc(9)),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
+        _card(
+          title: tr('Интерфейс', 'Interface'),
+          icon: Icons.dashboard_customize_rounded,
           children: [
-            Icon(Icons.restart_alt_rounded, size: sc(14), color: t.buttonTextColor),
-            SizedBox(width: sc(8)),
-            Text(tr('Сброс', 'Reset'),
-                style: TextStyle(
-                    fontSize: sc(12),
-                    color: t.buttonTextColor,
-                    fontWeight: FontWeight.w700)),
+            _slider(tr('Масштаб', 'Scale'), UiSettings.uiScale.value, 0.7, 1.6,
+                (v) {
+              UiSettings.uiScale.value = v;
+              UiScale.value = v;
+              UiSettings.save();
+            },
+                suffix: '${(UiSettings.uiScale.value * 100).toInt()}%',
+                factor: 100),
+            _sep(),
+            _slider(tr('Скругление', 'Radius'), UiSettings.glassRadius.value, 8,
+                48, (v) {
+              UiSettings.glassRadius.value = v;
+              UiSettings.save();
+            }),
+            _sep(),
+            _switch(tr('Сайдбар справа', 'Sidebar right'),
+                UiSettings.sidebarRight.value, () {
+              UiSettings.sidebarRight.value = !UiSettings.sidebarRight.value;
+              UiSettings.save();
+            }, icon: Icons.flip_to_front_rounded),
+            _sep(),
+            Row(children: [
+              _chip(tr('Системный шрифт', 'System'),
+                  UiSettings.fontMode.value == 0, () {
+                UiSettings.fontMode.value = 0;
+                UiSettings.save();
+              }),
+              SizedBox(width: sc(8)),
+              _chip(tr('Моно', 'Mono'), UiSettings.fontMode.value == 1, () {
+                UiSettings.fontMode.value = 1;
+                UiSettings.save();
+              }),
+            ]),
           ],
         ),
-      ),
-    ]),
-  ]);
+        _gap(),
+        _card(
+            title: tr('Запуск', 'Startup'),
+            icon: Icons.rocket_launch_rounded,
+            children: [
+              _switch(tr('Бут-анимация', 'Boot animation'),
+                  UiSettings.bootEnabled.value, () {
+                UiSettings.bootEnabled.value = !UiSettings.bootEnabled.value;
+                UiSettings.save();
+              }, icon: Icons.play_circle_outline_rounded),
+              _sep(),
+              _slider(tr('Длительность бут', 'Boot duration'),
+                  UiSettings.bootDuration.value, 2.0, 6.0, (v) {
+                UiSettings.bootDuration.value = v;
+                UiSettings.save();
+              },
+                  suffix:
+                      '${UiSettings.bootDuration.value.toStringAsFixed(1)}s'),
+              _sep(),
+              Container(
+                decoration: BoxDecoration(
+                  color: Colors.black.withOpacity(t.isDark ? 0.35 : 0.06),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: t.accent.withOpacity(0.4)),
+                ),
+                child: TextField(
+                  controller:
+                      TextEditingController(text: UiSettings.bootCaption.value),
+                  onSubmitted: (s) {
+                    UiSettings.bootCaption.value = s;
+                    UiSettings.save();
+                  },
+                  style: TextStyle(color: t.text, fontSize: 12),
+                  decoration: InputDecoration(
+                    isDense: true,
+                    border: InputBorder.none,
+                    prefixIcon:
+                        Icon(Icons.title_rounded, size: 14, color: t.accent),
+                    hintText: tr(
+                        'Подпись на бут-экране (пусто = стандарт)',
+                        'Boot caption (empty = default)'),
+                    hintStyle: TextStyle(
+                        color: t.text.withOpacity(0.35), fontSize: 11),
+                    contentPadding: EdgeInsets.symmetric(
+                        horizontal: sc(10), vertical: sc(10)),
+                  ),
+                ),
+              ),
+            ]),
+        _gap(),
+        _card(
+          title: tr('Поведение', 'Behaviour'),
+          icon: Icons.tune_rounded,
+          children: [
+            _slider(tr('Скорость анимаций', 'Animation speed'),
+                UiSettings.animSpeed.value, 0.5, 2.0, (v) {
+              UiSettings.animSpeed.value = v;
+              UiSettings.save();
+            },
+                suffix:
+                    'x${UiSettings.animSpeed.value.toStringAsFixed(1)}'),
+            _sep(),
+            _switch(tr('Анимации', 'Animations'),
+                UiSettings.animationsEnabled.value, () {
+              UiSettings.animationsEnabled.value =
+                  !UiSettings.animationsEnabled.value;
+              UiSettings.save();
+            }, icon: Icons.animation_rounded),
+          ],
+        ),
+      ]);
+
+  Widget _glass() => _col([
+        _card(
+            title: tr('Размытие', 'Blur'),
+            icon: Icons.water_drop_rounded,
+            children: [
+              _switch(tr('Реальный blur (GPU)', 'Real blur (GPU)'),
+                  UiSettings.realBlur.value, () {
+                UiSettings.realBlur.value = !UiSettings.realBlur.value;
+                UiSettings.save();
+              }, icon: Icons.blur_on_rounded),
+              _sep(),
+              _slider(
+                  tr('Размытие', 'Blur'), UiSettings.blurSigma.value, 0, 50,
+                  (v) {
+                UiSettings.blurSigma.value = v;
+                UiSettings.save();
+              }),
+              _sep(),
+              _slider(tr('Насыщенность', 'Saturation'),
+                  UiSettings.saturation.value, 1.0, 2.0, (v) {
+                UiSettings.saturation.value = v;
+                UiSettings.save();
+              }, suffix: UiSettings.saturation.value.toStringAsFixed(2)),
+              _sep(),
+              _slider(tr('Прозрачность', 'Opacity'),
+                  UiSettings.glassOpacity.value, 0.0, 0.8, (v) {
+                UiSettings.glassOpacity.value = v;
+                UiSettings.save();
+              }, suffix: UiSettings.glassOpacity.value.toStringAsFixed(2)),
+            ]),
+        _gap(),
+        _card(
+            title: tr('Оттенок', 'Tint'),
+            icon: Icons.colorize_rounded,
+            children: [
+              _colorRow(tr('Оттенок стекла', 'Glass tint'),
+                  UiSettings.glassTint.value, (c) {
+                UiSettings.glassTint.value = c;
+                UiSettings.save();
+              }),
+              _sep(),
+              Btn25D(
+                base: t.accent,
+                radius: 999,
+                onTap: () => UiSettings.resetGlass(),
+                padding: EdgeInsets.symmetric(vertical: sc(9)),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.restart_alt_rounded,
+                        size: sc(14), color: t.buttonTextColor),
+                    SizedBox(width: sc(8)),
+                    Text(tr('Сброс', 'Reset'),
+                        style: TextStyle(
+                            fontSize: sc(12),
+                            color: t.buttonTextColor,
+                            fontWeight: FontWeight.w700)),
+                  ],
+                ),
+              ),
+            ]),
+      ]);
 
   Widget _glow() => _col([
-    _card(
-      title: tr('Свечение и грани', 'Glow & Edges'),
-      icon: Icons.auto_awesome_rounded,
-      children: [
-        _slider(tr('Блик по краям', 'Edge glow'), UiSettings.edgeGlow.value, 0, 1, (v) {
-          UiSettings.edgeGlow.value = v;
-          UiSettings.save();
-        }, suffix: UiSettings.edgeGlow.value.toStringAsFixed(2)),
-        _sep(),
-        _slider(tr('Граница', 'Border'), UiSettings.borderOpacity.value, 0, 0.6, (v) {
-          UiSettings.borderOpacity.value = v;
-          UiSettings.save();
-        }, suffix: UiSettings.borderOpacity.value.toStringAsFixed(2)),
-        _sep(),
-        _slider(tr('Верхний блик', 'Specular'), UiSettings.specular.value, 0, 1, (v) {
-          UiSettings.specular.value = v;
-          UiSettings.save();
-        }, suffix: UiSettings.specular.value.toStringAsFixed(2)),
-      ],
-    ),
-  ]);
+        _card(
+          title: tr('Свечение и грани', 'Glow & Edges'),
+          icon: Icons.auto_awesome_rounded,
+          children: [
+            _slider(tr('Блик по краям', 'Edge glow'),
+                UiSettings.edgeGlow.value, 0, 1, (v) {
+              UiSettings.edgeGlow.value = v;
+              UiSettings.save();
+            }, suffix: UiSettings.edgeGlow.value.toStringAsFixed(2)),
+            _sep(),
+            _slider(tr('Граница', 'Border'),
+                UiSettings.borderOpacity.value, 0, 0.6, (v) {
+              UiSettings.borderOpacity.value = v;
+              UiSettings.save();
+            }, suffix: UiSettings.borderOpacity.value.toStringAsFixed(2)),
+            _sep(),
+            _slider(tr('Верхний блик', 'Specular'), UiSettings.specular.value,
+                0, 1, (v) {
+              UiSettings.specular.value = v;
+              UiSettings.save();
+            }, suffix: UiSettings.specular.value.toStringAsFixed(2)),
+          ],
+        ),
+      ]);
 
   Widget _background() => _col([
-    _card(title: tr('Стиль', 'Style'), icon: Icons.landscape_rounded, children: [
-      _switch(tr('Живой фон', 'Live background'), UiSettings.liveBg.value, () {
-        UiSettings.liveBg.value = !UiSettings.liveBg.value;
-        UiSettings.save();
-      }),
-      _sep(),
-      ValueListenableBuilder<int>(
-        valueListenable: UiSettings.bgStyle,
-        builder: (ctx, st, _) => Row(children: [
-          _bgChip(0, Icons.cloud_rounded, tr('Аврора', 'Aurora'), st),
-          SizedBox(width: sc(6)),
-          _bgChip(1, Icons.waves_rounded, tr('Волны', 'Waves'), st),
-          SizedBox(width: sc(6)),
-          _bgChip(2, Icons.nightlight_rounded, tr('Звёзды', 'Stars'), st),
-          SizedBox(width: sc(6)),
-          _bgChip(3, Icons.flashlight_on_rounded, tr('Моя волна', 'My Wave'), st),
-        ]),
-      ),
-    ]),
-    _gap(),
-    _card(title: tr('Настройка', 'Tuning'), icon: Icons.speed_rounded, children: [
-      _slider(tr('Скорость фона', 'Background speed'),
-          UiSettings.auroraSpeed.value, 0.3, 3.0, (v) {
-        UiSettings.auroraSpeed.value = v;
-        UiSettings.save();
-      }, suffix: 'x${UiSettings.auroraSpeed.value.toStringAsFixed(1)}'),
-      _sep(),
-      _slider(tr('Виньетка', 'Vignette'), UiSettings.vignette.value, 0.0, 0.8, (v) {
-        UiSettings.vignette.value = v;
-        UiSettings.save();
-      }, suffix: UiSettings.vignette.value.toStringAsFixed(2)),
-      _sep(),
-      _switch(tr('Параллакс', 'Parallax'), UiSettings.parallax.value, () {
-        UiSettings.parallax.value = !UiSettings.parallax.value;
-        UiSettings.save();
-      }, icon: Icons.motion_photos_on_rounded),
-      _sep(),
-      _colorRow(tr('Цвет фона', 'Background color'),
-          UiSettings.bgColor.value ?? t.accent, (c) {
-        UiSettings.bgColor.value = c.withOpacity(1);
-        UiSettings.save();
-      }, onReset: () {
-        UiSettings.bgColor.value = null;
-        UiSettings.save();
-      }),
-    ]),
-  ]);
+        _card(
+            title: tr('Стиль', 'Style'),
+            icon: Icons.landscape_rounded,
+            children: [
+              _switch(tr('Живой фон', 'Live background'),
+                  UiSettings.liveBg.value, () {
+                UiSettings.liveBg.value = !UiSettings.liveBg.value;
+                UiSettings.save();
+              }),
+              _sep(),
+              ValueListenableBuilder<int>(
+                valueListenable: UiSettings.bgStyle,
+                builder: (ctx, st, _) => Row(children: [
+                  _bgChip(0, Icons.cloud_rounded,
+                      tr('Аврора', 'Aurora'), st),
+                  SizedBox(width: sc(6)),
+                  _bgChip(1, Icons.waves_rounded, tr('Волны', 'Waves'), st),
+                  SizedBox(width: sc(6)),
+                  _bgChip(2, Icons.nightlight_rounded,
+                      tr('Звёзды', 'Stars'), st),
+                  SizedBox(width: sc(6)),
+                  _bgChip(3, Icons.flashlight_on_rounded,
+                      tr('Моя волна', 'My Wave'), st),
+                  SizedBox(width: sc(6)),
+                  _bgChip(4, Icons.filter_drama_rounded,
+                      tr('Облака', 'Clouds'), st),
+                ]),
+              ),
+            ]),
+        _gap(),
+        _card(
+            title: tr('Настройка', 'Tuning'),
+            icon: Icons.speed_rounded,
+            children: [
+              _slider(tr('Скорость фона', 'Background speed'),
+                  UiSettings.auroraSpeed.value, 0.3, 3.0, (v) {
+                UiSettings.auroraSpeed.value = v;
+                UiSettings.save();
+              },
+                  suffix:
+                      'x${UiSettings.auroraSpeed.value.toStringAsFixed(1)}'),
+              _sep(),
+              _slider(
+                  tr('Виньетка', 'Vignette'), UiSettings.vignette.value, 0.0, 0.8,
+                  (v) {
+                UiSettings.vignette.value = v;
+                UiSettings.save();
+              }, suffix: UiSettings.vignette.value.toStringAsFixed(2)),
+              _sep(),
+              _switch(tr('Параллакс', 'Parallax'), UiSettings.parallax.value,
+                  () {
+                UiSettings.parallax.value = !UiSettings.parallax.value;
+                UiSettings.save();
+              }, icon: Icons.motion_photos_on_rounded),
+              _sep(),
+              _colorRow(tr('Цвет фона', 'Background color'),
+                  UiSettings.bgColor.value ?? t.accent, (c) {
+                UiSettings.bgColor.value = c;
+                UiSettings.save();
+              }, onReset: () {
+                UiSettings.bgColor.value = null;
+                UiSettings.save();
+              }),
+            ]),
+      ]);
 
   Widget _graphics() => _col([
-    _card(title: tr('Кадровая частота', 'Frame rate'), icon: Icons.monitor_rounded, children: [
-      Row(children: [
-        for (final f in [12, 24, 30, 60]) ...[
-          Expanded(child: _fpsChip(f)),
-          if (f != 60) SizedBox(width: sc(6)),
-        ],
-      ]),
-      _sep(),
-      _switch(tr('Экономия энергии', 'Power saving'), UiSettings.ecoMode.value, () {
-        final on = !UiSettings.ecoMode.value;
-        UiSettings.ecoMode.value = on;
-        if (on) UiSettings.parallax.value = false;
-        UiSettings.save();
-      }, icon: Icons.battery_saver_rounded),
-      _sep(),
-      _switch(tr('Тени карточек и кнопок', 'Card & button shadows'),
-          UiSettings.cardShadows.value, () {
-        UiSettings.cardShadows.value = !UiSettings.cardShadows.value;
-        UiSettings.save();
-      }, icon: Icons.layers_rounded),
-    ]),
-  ]);
+        _card(
+            title: tr('Кадровая частота', 'Frame rate'),
+            icon: Icons.monitor_rounded,
+            children: [
+              Row(children: [
+                for (final f in [12, 24, 30, 60]) ...[
+                  Expanded(child: _fpsChip(f)),
+                  if (f != 60) SizedBox(width: sc(6)),
+                ],
+              ]),
+              _sep(),
+              _switch(
+                  tr('Экономия энергии', 'Power saving'),
+                  UiSettings.ecoMode.value, () {
+                final on = !UiSettings.ecoMode.value;
+                UiSettings.ecoMode.value = on;
+                if (on) UiSettings.parallax.value = false;
+                UiSettings.save();
+              }, icon: Icons.battery_saver_rounded),
+              _sep(),
+              _switch(
+                  tr('Тени карточек и кнопок', 'Card & button shadows'),
+                  UiSettings.cardShadows.value, () {
+                UiSettings.cardShadows.value = !UiSettings.cardShadows.value;
+                UiSettings.save();
+              }, icon: Icons.layers_rounded),
+            ]),
+      ]);
 
   Widget _fpsChip(int f) {
     final active = UiSettings.fpsCap.value == f;
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
       onTap: () {
+        SoundService.toggle();
         UiSettings.fpsCap.value = f;
         UiSettings.save();
       },
@@ -537,65 +614,89 @@ class _SettingsPageState extends State<SettingsPage>
           color: active ? t.accent.withOpacity(0.8) : t.card.withOpacity(0.5),
           borderRadius: BorderRadius.circular(999),
           border: Border.all(
-              color: active ? t.accent : Colors.white.withOpacity(t.isDark ? 0.10 : 0.5)),
+              color: active
+                  ? t.accent
+                  : Colors.white.withOpacity(t.isDark ? 0.10 : 0.5)),
         ),
         child: Center(
           child: Text('$f FPS',
               style: TextStyle(
                   fontSize: sc(11),
                   fontWeight: FontWeight.w800,
-                  color: active ? t.buttonTextColor : t.text.withOpacity(0.6))),
+                  color:
+                      active ? t.buttonTextColor : t.text.withOpacity(0.6))),
         ),
       ),
     );
   }
 
   Widget _sound() => _col([
-    _card(title: tr('Звук', 'Sound'), icon: Icons.graphic_eq_rounded, children: [
-      _switch(tr('Звуки интерфейса', 'Interface sounds'),
-          UiSettings.soundEnabled.value, () {
-        UiSettings.soundEnabled.value = !UiSettings.soundEnabled.value;
-        UiSettings.save();
-        if (UiSettings.soundEnabled.value) SoundService.toggle();
-      }, icon: Icons.graphic_eq_rounded),
-      _sep(),
-      ValueListenableBuilder<double>(
-        valueListenable: UiSettings.soundVolume,
-        builder: (ctx, v, _) => _slider(tr('Громкость', 'Volume'), v, 0.0, 1.0, (x) {
-          UiSettings.soundVolume.value = x;
-          UiSettings.save();
-        }, suffix: '${(v * 100).toInt()}%'),
-      ),
-      _sep(),
-      Btn25D(
-        base: t.surface,
-        radius: 999,
-        onTap: () {
-          final dir =
-              '${File(Platform.resolvedExecutable).parent.path}\\data\\flutter_assets\\assets';
-          Process.run('explorer', [dir]);
-        },
-        padding: EdgeInsets.symmetric(horizontal: sc(12), vertical: sc(9)),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.folder_open_rounded, size: sc(14), color: t.accent),
-            SizedBox(width: sc(6)),
-            Text(tr('Папка со звуками', 'Sounds folder'),
-                style: TextStyle(
-                    fontSize: sc(11),
-                    color: t.text,
-                    fontWeight: FontWeight.w600)),
-          ],
-        ),
-      ),
-    ]),
-    _gap(),
-    _card(title: tr('События', 'Events'), icon: Icons.tune_rounded, children: [
-      for (final e in ['start', 'stop', 'click', 'toggle', 'toast', 'notify', 'error'])
-        _soundRow(e),
-    ]),
-  ]);
+        _card(
+            title: tr('Звук', 'Sound'),
+            icon: Icons.graphic_eq_rounded,
+            children: [
+              _switch(tr('Звуки интерфейса', 'Interface sounds'),
+                  UiSettings.soundEnabled.value, () {
+                UiSettings.soundEnabled.value = !UiSettings.soundEnabled.value;
+                UiSettings.save();
+                if (UiSettings.soundEnabled.value) SoundService.toggle();
+              }, icon: Icons.graphic_eq_rounded),
+              _sep(),
+              ValueListenableBuilder<double>(
+                valueListenable: UiSettings.soundVolume,
+                builder: (ctx, v, _) =>
+                    _slider(tr('Громкость', 'Volume'), v, 0.0, 1.0, (x) {
+                  UiSettings.soundVolume.value = x;
+                  UiSettings.save();
+                }, suffix: '${(v * 100).toInt()}%', factor: 100),
+              ),
+              _sep(),
+              Btn25D(
+                base: t.surface,
+                radius: 999,
+                onTap: () {
+                  final dir =
+                      '${File(Platform.resolvedExecutable).parent.path}\\data\\flutter_assets\\assets';
+                  Process.run('explorer', [dir]);
+                },
+                padding:
+                    EdgeInsets.symmetric(horizontal: sc(12), vertical: sc(9)),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.folder_open_rounded,
+                        size: sc(14), color: t.accent),
+                    SizedBox(width: sc(6)),
+                    Text(tr('Папка со звуками', 'Sounds folder'),
+                        style: TextStyle(
+                            fontSize: sc(11),
+                            color: t.text,
+                            fontWeight: FontWeight.w600)),
+                  ],
+                ),
+              ),
+            ]),
+        _gap(),
+        _card(
+            title: tr('События', 'Events'),
+            icon: Icons.tune_rounded,
+            children: [
+              for (final e in [
+                'start',
+                'stop',
+                'restart',
+                'click',
+                'toggle',
+                'on',
+                'off',
+                'notify',
+                'update',
+                'complete',
+                'error',
+              ])
+                _soundRow(e),
+            ]),
+      ]);
 
   Widget _soundRow(String event) {
     final custom = UiSettings.soundPath(event);
@@ -609,23 +710,32 @@ class _SettingsPageState extends State<SettingsPage>
         decoration: BoxDecoration(
           color: t.card.withOpacity(0.5),
           borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: Colors.white.withOpacity(t.isDark ? 0.10 : 0.5)),
+          border: Border.all(
+              color: Colors.white.withOpacity(t.isDark ? 0.10 : 0.5)),
         ),
         child: Row(children: [
           Expanded(
-            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text(SoundService.labels[event] ?? event,
-                  style: TextStyle(
-                      fontSize: sc(12), fontWeight: FontWeight.w700, color: t.text)),
-              Text(name,
-                  style: TextStyle(fontSize: sc(10), color: t.text.withOpacity(0.5)),
-                  overflow: TextOverflow.ellipsis),
-            ]),
+            child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(SoundService.labels[event] ?? event,
+                      style: TextStyle(
+                          fontSize: sc(12),
+                          fontWeight: FontWeight.w700,
+                          color: t.text)),
+                  Text(name,
+                      style: TextStyle(
+                          fontSize: sc(10), color: t.text.withOpacity(0.5)),
+                      overflow: TextOverflow.ellipsis),
+                ]),
           ),
-          _iconBtn(Icons.play_arrow_rounded, () => SoundService.preview(event)),
+          _iconBtn(Icons.play_arrow_rounded,
+              () => SoundService.preview(event),
+              click: false),
           SizedBox(width: sc(6)),
           _iconBtn(Icons.folder_open_rounded, () async {
-            final picked = await FilePicker.platform.pickFiles(type: FileType.audio);
+            final picked =
+                await FilePicker.platform.pickFiles(type: FileType.audio);
             if (picked != null && picked.files.isNotEmpty) {
               final path = picked.files.first.path;
               if (path != null) {
@@ -646,209 +756,223 @@ class _SettingsPageState extends State<SettingsPage>
   }
 
   Widget _about() => _col([
-    Container(
-      width: double.infinity,
-      padding: EdgeInsets.symmetric(vertical: sc(26), horizontal: sc(16)),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [
-            t.accent.withOpacity(0.18),
-            t.accent.withOpacity(0.05),
-            Colors.transparent,
-          ],
-        ),
-        borderRadius: BorderRadius.circular(sc(22)),
-        border: Border.all(color: t.accent.withOpacity(0.3)),
-      ),
-      child: Column(children: [
         Container(
-          width: sc(68),
-          height: sc(68),
+          width: double.infinity,
+          padding: EdgeInsets.symmetric(vertical: sc(26), horizontal: sc(16)),
           decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            border: Border.all(color: t.accent.withOpacity(0.5), width: 1.5),
-            boxShadow: [
-              BoxShadow(color: t.accent.withOpacity(0.4), blurRadius: sc(26)),
-            ],
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [
+                t.accent.withOpacity(0.18),
+                t.accent.withOpacity(0.05),
+                Colors.transparent,
+              ],
+            ),
+            borderRadius: BorderRadius.circular(sc(22)),
+            border: Border.all(color: t.accent.withOpacity(0.3)),
           ),
-          child: ClipOval(
-              child: Image.asset('assets/z2m_black_logo_256.png')),
-        ),
-        SizedBox(height: sc(14)),
-        Text('Z2 Mini',
-            style: TextStyle(
-                fontSize: sc(22),
-                fontWeight: FontWeight.w900,
-                letterSpacing: 0.5,
-                color: t.text)),
-        SizedBox(height: sc(8)),
-        Container(
-          padding: EdgeInsets.symmetric(horizontal: sc(12), vertical: sc(5)),
-          decoration: BoxDecoration(
-            color: t.accent.withOpacity(0.15),
-            borderRadius: BorderRadius.circular(999),
-            border: Border.all(color: t.accent.withOpacity(0.4)),
-          ),
-          child: Text('v${UpdateService.currentVersion} · Liquid Glass Edition',
+          child: Column(children: [
+            Container(
+              width: sc(68),
+              height: sc(68),
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                border:
+                    Border.all(color: t.accent.withOpacity(0.5), width: 1.5),
+                boxShadow: [
+                  BoxShadow(
+                      color: t.accent.withOpacity(0.4), blurRadius: sc(26)),
+                ],
+              ),
+              child: ClipOval(
+                  child: Image.asset('assets/z2m_black_logo_256.png')),
+            ),
+            SizedBox(height: sc(14)),
+            Text('Z2 Mini',
+                style: TextStyle(
+                    fontSize: sc(22),
+                    fontWeight: FontWeight.w900,
+                    letterSpacing: 0.5,
+                    color: t.text)),
+            SizedBox(height: sc(8)),
+            Container(
+              padding: EdgeInsets.symmetric(horizontal: sc(12), vertical: sc(5)),
+              decoration: BoxDecoration(
+                color: t.accent.withOpacity(0.15),
+                borderRadius: BorderRadius.circular(999),
+                border: Border.all(color: t.accent.withOpacity(0.4)),
+              ),
+              child: Text('v${UpdateService.currentVersion} · Liquid Glass Edition',
+                  style: TextStyle(
+                      fontSize: sc(10),
+                      fontWeight: FontWeight.w700,
+                      color: t.accent)),
+            ),
+            SizedBox(height: sc(12)),
+            Text(
+              tr(
+                  'Мини-менеджер Zapret: обход блокировок YouTube, Discord и игр. Основан на Z2 Manager.',
+                  'Mini manager for Zapret: bypass blocks of YouTube, Discord and games. Based on Z2 Manager.'),
+              textAlign: TextAlign.center,
               style: TextStyle(
-                  fontSize: sc(10),
-                  fontWeight: FontWeight.w700,
-                  color: t.accent)),
+                  fontSize: sc(11),
+                  height: 1.55,
+                  color: t.text.withOpacity(0.55)),
+            ),
+          ]),
         ),
-        SizedBox(height: sc(12)),
-        Text(
-          tr('Мини-менеджер Zapret: обход блокировок YouTube, Discord и игр. Основан на Z2 Manager.',
-              'Mini manager for Zapret: bypass blocks of YouTube, Discord and games. Based on Z2 Manager.'),
-          textAlign: TextAlign.center,
-          style: TextStyle(
-              fontSize: sc(11),
-              height: 1.55,
-              color: t.text.withOpacity(0.55)),
-        ),
-      ]),
-    ),
-    _gap(),
-    Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      Expanded(
-        child: _card(
-          title: tr('Язык и окно', 'Language & Window'),
-          icon: Icons.translate_rounded,
-          children: [
-            Row(children: [
-              _chip('RU', UiSettings.language.value == 'RU',
-                  () => UiSettings.setLang('RU')),
-              SizedBox(width: sc(8)),
-              _chip('EN', UiSettings.language.value == 'EN',
-                  () => UiSettings.setLang('EN')),
-            ]),
-            _sep(),
-            _switch(tr('Крестик — в трей', 'Close to tray'),
-                UiSettings.closeToTray.value, () {
-              UiSettings.closeToTray.value = !UiSettings.closeToTray.value;
-              UiSettings.save();
-            }, icon: Icons.system_security_update_rounded),
-            _sep(),
-            _switch(tr('Окно поверх всех', 'Always on top'),
-                UiSettings.alwaysOnTop.value, () {
-              UiSettings.alwaysOnTop.value = !UiSettings.alwaysOnTop.value;
-              UiSettings.save();
-              windowManager.setAlwaysOnTop(UiSettings.alwaysOnTop.value);
-            }, icon: Icons.push_pin_rounded),
-            _sep(),
-            _slider(tr('Прозрачность окна', 'Window opacity'),
-                UiSettings.windowOpacity.value, 0.5, 1.0, (v) {
-              UiSettings.windowOpacity.value = v;
-              UiSettings.save();
-              windowManager.setOpacity(v);
-            }, suffix: '${(UiSettings.windowOpacity.value * 100).toInt()}%'),
-          ],
-        ),
-      ),
-      SizedBox(width: sc(10)),
-      Expanded(
-        child: _card(
-          title: tr('Данные', 'Data'),
-          icon: Icons.folder_rounded,
-          children: [
-            Btn25D(
-              base: t.surface,
-              radius: 999,
-              onTap: _pickZapretFolder,
-              padding: EdgeInsets.symmetric(horizontal: sc(12), vertical: sc(10)),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(Icons.folder_zip_rounded, size: sc(14), color: t.accent),
-                  SizedBox(width: sc(6)),
-                  Flexible(
-                    child: Text(
-                      UiSettings.zapretPath.value ?? r'C:\zapret_programm',
-                      style: TextStyle(
-                          fontSize: sc(11),
-                          color: t.text,
-                          fontWeight: FontWeight.w600),
-                      overflow: TextOverflow.ellipsis,
-                    ),
+        _gap(),
+        Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Expanded(
+            child: _card(
+              title: tr('Язык и окно', 'Language & Window'),
+              icon: Icons.translate_rounded,
+              children: [
+                Row(children: [
+                  _chip('RU', UiSettings.language.value == 'RU',
+                      () => UiSettings.setLang('RU')),
+                  SizedBox(width: sc(8)),
+                  _chip('EN', UiSettings.language.value == 'EN',
+                      () => UiSettings.setLang('EN')),
+                ]),
+                _sep(),
+                _switch(tr('Крестик — в трей', 'Close to tray'),
+                    UiSettings.closeToTray.value, () {
+                  UiSettings.closeToTray.value = !UiSettings.closeToTray.value;
+                  UiSettings.save();
+                }, icon: Icons.system_security_update_rounded),
+                _sep(),
+                _switch(tr('Окно поверх всех', 'Always on top'),
+                    UiSettings.alwaysOnTop.value, () {
+                  UiSettings.alwaysOnTop.value = !UiSettings.alwaysOnTop.value;
+                  UiSettings.save();
+                  windowManager.setAlwaysOnTop(UiSettings.alwaysOnTop.value);
+                }, icon: Icons.push_pin_rounded),
+                _sep(),
+                _slider(tr('Прозрачность окна', 'Window opacity'),
+                    UiSettings.windowOpacity.value, 0.5, 1.0, (v) {
+                  UiSettings.windowOpacity.value = v;
+                  UiSettings.save();
+                  windowManager.setOpacity(v);
+                },
+                    suffix:
+                        '${(UiSettings.windowOpacity.value * 100).toInt()}%',
+                    factor: 100),
+              ],
+            ),
+          ),
+          SizedBox(width: sc(10)),
+          Expanded(
+            child: _card(
+              title: tr('Данные', 'Data'),
+              icon: Icons.folder_rounded,
+              children: [
+                Btn25D(
+                  base: t.surface,
+                  radius: 999,
+                  onTap: _pickZapretFolder,
+                  padding: EdgeInsets.symmetric(
+                      horizontal: sc(12), vertical: sc(10)),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.folder_zip_rounded,
+                          size: sc(14), color: t.accent),
+                      SizedBox(width: sc(6)),
+                      Flexible(
+                        child: Text(
+                          UiSettings.zapretPath.value ?? r'C:\zapret_programm',
+                          style: TextStyle(
+                              fontSize: sc(11),
+                              color: t.text,
+                              fontWeight: FontWeight.w600),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ],
                   ),
-                ],
-              ),
+                ),
+                _sep(),
+                Btn25D(
+                  base: t.surface,
+                  radius: 999,
+                  onTap: () async {
+                    final url =
+                        Uri.parse('https://github.com/Ank01rd/ZapretManager');
+                    if (await canLaunchUrl(url)) await launchUrl(url);
+                  },
+                  padding: EdgeInsets.symmetric(
+                      horizontal: sc(12), vertical: sc(10)),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.code_rounded, size: sc(14), color: t.accent),
+                      SizedBox(width: sc(6)),
+                      Text('GitHub',
+                          style: TextStyle(
+                              fontSize: sc(11),
+                              color: t.text,
+                              fontWeight: FontWeight.w600)),
+                    ],
+                  ),
+                ),
+                _sep(),
+                Btn25D(
+                  base: t.surface,
+                  radius: 999,
+                  onTap: () {
+                    final dir = '${Platform.environment['APPDATA']}\\Z2Mini';
+                    Directory(dir).createSync(recursive: true);
+                    Process.run('explorer', [dir]);
+                  },
+                  padding: EdgeInsets.symmetric(
+                      horizontal: sc(12), vertical: sc(10)),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.folder_open_rounded,
+                          size: sc(14), color: t.accent),
+                      SizedBox(width: sc(6)),
+                      Text(tr('Папка данных', 'Data folder'),
+                          style: TextStyle(
+                              fontSize: sc(11),
+                              color: t.text,
+                              fontWeight: FontWeight.w600)),
+                    ],
+                  ),
+                ),
+                _sep(),
+                Btn25D(
+                  base: t.surface,
+                  radius: 999,
+                  onTap: () {
+                    UiSettings.resetAll();
+                    NotifyService.push(
+                        tr('Настройки сброшены', 'Settings reset'),
+                        icon: Icons.restart_alt_rounded);
+                  },
+                  padding: EdgeInsets.symmetric(
+                      horizontal: sc(12), vertical: sc(10)),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.restart_alt_rounded,
+                          size: sc(14), color: const Color(0xFFEF4444)),
+                      SizedBox(width: sc(6)),
+                      Text(tr('Сбросить все настройки', 'Reset all settings'),
+                          style: TextStyle(
+                              fontSize: sc(11),
+                              color: const Color(0xFFEF4444),
+                              fontWeight: FontWeight.w600)),
+                    ],
+                  ),
+                ),
+              ],
             ),
-            _sep(),
-            Btn25D(
-              base: t.surface,
-              radius: 999,
-              onTap: () async {
-                final url = Uri.parse('https://github.com/Ank01rd/ZapretManager');
-                if (await canLaunchUrl(url)) await launchUrl(url);
-              },
-              padding: EdgeInsets.symmetric(horizontal: sc(12), vertical: sc(10)),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(Icons.code_rounded, size: sc(14), color: t.accent),
-                  SizedBox(width: sc(6)),
-                  Text('GitHub',
-                      style: TextStyle(
-                          fontSize: sc(11),
-                          color: t.text,
-                          fontWeight: FontWeight.w600)),
-                ],
-              ),
-            ),
-            _sep(),
-            Btn25D(
-              base: t.surface,
-              radius: 999,
-              onTap: () {
-                final dir = '${Platform.environment['APPDATA']}\\Z2Mini';
-                Directory(dir).createSync(recursive: true);
-                Process.run('explorer', [dir]);
-              },
-              padding: EdgeInsets.symmetric(horizontal: sc(12), vertical: sc(10)),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(Icons.folder_open_rounded, size: sc(14), color: t.accent),
-                  SizedBox(width: sc(6)),
-                  Text(tr('Папка данных', 'Data folder'),
-                      style: TextStyle(
-                          fontSize: sc(11),
-                          color: t.text,
-                          fontWeight: FontWeight.w600)),
-                ],
-              ),
-            ),
-            _sep(),
-            Btn25D(
-              base: t.surface,
-              radius: 999,
-              onTap: () {
-                UiSettings.resetAll();
-                NotifyService.push(
-                    tr('Настройки сброшены', 'Settings reset'),
-                    icon: Icons.restart_alt_rounded);
-              },
-              padding: EdgeInsets.symmetric(horizontal: sc(12), vertical: sc(10)),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(Icons.restart_alt_rounded, size: sc(14), color: const Color(0xFFEF4444)),
-                  SizedBox(width: sc(6)),
-                  Text(tr('Сбросить все настройки', 'Reset all settings'),
-                      style: TextStyle(
-                          fontSize: sc(11),
-                          color: const Color(0xFFEF4444),
-                          fontWeight: FontWeight.w600)),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
-    ]),
-  ]);
+          ),
+        ]),
+      ]);
 
   Future<void> _pickZapretFolder() async {
     final dir = await FilePicker.platform.getDirectoryPath();
@@ -862,6 +986,7 @@ class _SettingsPageState extends State<SettingsPage>
         tr('Это не папка Zapret: нет service.bat или winws.exe',
             'Not a Zapret folder: no service.bat or winws.exe'),
         icon: Icons.warning_amber_rounded,
+        soundEvent: 'error',
       );
       return;
     }
@@ -873,9 +998,13 @@ class _SettingsPageState extends State<SettingsPage>
         icon: Icons.folder_rounded);
   }
 
-  Widget _iconBtn(IconData ic, VoidCallback onTap) => GestureDetector(
+  Widget _iconBtn(IconData ic, VoidCallback onTap, {bool click = true}) =>
+      GestureDetector(
         behavior: HitTestBehavior.opaque,
-        onTap: onTap,
+        onTap: () {
+          if (click) SoundService.click();
+          onTap();
+        },
         child: Container(
           width: sc(30),
           height: sc(30),
@@ -894,7 +1023,8 @@ class _SettingsPageState extends State<SettingsPage>
         children: c,
       );
 
-  Widget _card({String? title, IconData? icon, required List<Widget> children}) =>
+  Widget _card(
+          {String? title, IconData? icon, required List<Widget> children}) =>
       Container(
         width: double.infinity,
         padding: EdgeInsets.all(sc(14)),
@@ -943,7 +1073,8 @@ class _SettingsPageState extends State<SettingsPage>
         decoration: BoxDecoration(
           color: t.card.withOpacity(0.5),
           borderRadius: BorderRadius.circular(999),
-          border: Border.all(color: Colors.white.withOpacity(t.isDark ? 0.10 : 0.5)),
+          border: Border.all(
+              color: Colors.white.withOpacity(t.isDark ? 0.10 : 0.5)),
         ),
         child: Row(children: [
           Icon(icon, color: t.accent, size: 18),
@@ -951,11 +1082,20 @@ class _SettingsPageState extends State<SettingsPage>
           Expanded(
             child: Text(label,
                 style: TextStyle(
-                    fontSize: 13, fontWeight: FontWeight.w600, color: t.text)),
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: t.text)),
           ),
           Switch(
             value: value,
-            onChanged: (_) => onChanged(),
+            onChanged: (_) {
+              if (value) {
+                SoundService.off();
+              } else {
+                SoundService.on();
+              }
+              onChanged();
+            },
             activeColor: t.buttonTextColor,
             activeTrackColor: t.buttonColor.withOpacity(0.5),
             inactiveThumbColor: t.text.withOpacity(0.45),
@@ -965,13 +1105,15 @@ class _SettingsPageState extends State<SettingsPage>
       );
 
   Widget _slider(String label, double value, double min, double max,
-          ValueChanged<double> on, {String? suffix}) =>
+          ValueChanged<double> on,
+          {String? suffix, double factor = 1}) =>
       Padding(
         padding: EdgeInsets.only(top: sc(4)),
         child: Row(children: [
           SizedBox(
             width: sc(120),
-            child: Text(label, style: TextStyle(fontSize: 12, color: t.text)),
+            child:
+                Text(label, style: TextStyle(fontSize: 12, color: t.text)),
           ),
           Expanded(
             child: _GlassSlider(
@@ -985,19 +1127,25 @@ class _SettingsPageState extends State<SettingsPage>
                   : null,
             ),
           ),
-          SizedBox(
-            width: sc(44),
-            child: Text(suffix ?? value.toStringAsFixed(0),
-                style: TextStyle(
-                    fontSize: 11,
-                    color: t.accent,
-                    fontWeight: FontWeight.w700)),
+          _ValuePill(
+            text: suffix ?? value.toStringAsFixed(0),
+            factor: factor,
+            min: min,
+            max: max,
+            on: on,
+            accent: t.accent,
+            bg: Colors.black.withOpacity(t.isDark ? 0.35 : 0.06),
+            textColor: t.text,
           ),
         ]),
       );
 
-  Widget _chip(String label, bool active, VoidCallback onTap) => GestureDetector(
-        onTap: onTap,
+  Widget _chip(String label, bool active, VoidCallback onTap) =>
+      GestureDetector(
+        onTap: () {
+          SoundService.toggle();
+          onTap();
+        },
         child: AnimatedContainer(
           duration: t.animDur,
           curve: t.animCurve,
@@ -1047,7 +1195,8 @@ class _SettingsPageState extends State<SettingsPage>
                       color: t.text,
                       fontWeight: FontWeight.w600)),
             ),
-            Icon(Icons.colorize_rounded, size: 15, color: t.text.withOpacity(0.6)),
+            Icon(Icons.colorize_rounded,
+                size: 15, color: t.text.withOpacity(0.6)),
           ]),
         ),
       );
@@ -1073,7 +1222,8 @@ class _SettingsPageState extends State<SettingsPage>
           decoration: BoxDecoration(
             color: t.card.withOpacity(0.5),
             borderRadius: BorderRadius.circular(999),
-            border: Border.all(color: Colors.white.withOpacity(t.isDark ? 0.10 : 0.5)),
+            border: Border.all(
+                color: Colors.white.withOpacity(t.isDark ? 0.10 : 0.5)),
           ),
           child: LayoutBuilder(builder: (ctx, c) {
             final w = c.maxWidth;
@@ -1105,8 +1255,8 @@ class _SettingsPageState extends State<SettingsPage>
               Positioned.fill(
                 child: Row(children: [
                   Expanded(
-                    child: _themeOpt(
-                        Icons.dark_mode_rounded, tr('Тёмная', 'Dark'), isDark, true),
+                    child: _themeOpt(Icons.dark_mode_rounded,
+                        tr('Тёмная', 'Dark'), isDark, true),
                   ),
                   Expanded(
                     child: _themeOpt(Icons.light_mode_rounded,
@@ -1123,6 +1273,7 @@ class _SettingsPageState extends State<SettingsPage>
       GestureDetector(
         behavior: HitTestBehavior.opaque,
         onTap: () {
+          SoundService.toggle();
           UiSettings.isDark.value = value;
           UiSettings.save();
         },
@@ -1135,7 +1286,9 @@ class _SettingsPageState extends State<SettingsPage>
               style: TextStyle(
                   fontSize: sc(12),
                   fontWeight: FontWeight.w700,
-                  color: active ? t.buttonTextColor : t.text.withOpacity(0.6))),
+                  color: active
+                      ? t.buttonTextColor
+                      : t.text.withOpacity(0.6))),
         ]),
       );
 
@@ -1145,6 +1298,7 @@ class _SettingsPageState extends State<SettingsPage>
       child: GestureDetector(
         behavior: HitTestBehavior.opaque,
         onTap: () {
+          SoundService.toggle();
           UiSettings.bgStyle.value = id;
           UiSettings.save();
         },
@@ -1171,7 +1325,9 @@ class _SettingsPageState extends State<SettingsPage>
                   style: TextStyle(
                       fontSize: sc(10),
                       fontWeight: FontWeight.w700,
-                      color: active ? t.buttonTextColor : t.text.withOpacity(0.6)),
+                      color: active
+                          ? t.buttonTextColor
+                          : t.text.withOpacity(0.6)),
                   overflow: TextOverflow.ellipsis),
             ),
           ]),
@@ -1179,6 +1335,96 @@ class _SettingsPageState extends State<SettingsPage>
       ),
     );
   }
+}  // ← закрытие _SettingsPageState
+
+// 💊 компактная таблетка значения: тап → ввод числа, клампит в min/max
+class _ValuePill extends StatefulWidget {
+  final String text;
+  final double factor, min, max;
+  final ValueChanged<double> on;
+  final Color accent;
+  final Color bg;
+  final Color textColor;
+  const _ValuePill({
+    required this.text,
+    required this.factor,
+    required this.min,
+    required this.max,
+    required this.on,
+    required this.accent,
+    required this.bg,
+    required this.textColor,
+  });
+  @override
+  State<_ValuePill> createState() => _ValuePillState();
+}
+
+class _ValuePillState extends State<_ValuePill> {
+  bool _edit = false;
+  final _c = TextEditingController();
+  @override
+  void dispose() {
+    _c.dispose();
+    super.dispose();
+  }
+
+  void _commit() {
+    final p = double.tryParse(_c.text.trim().replaceAll(',', '.'));
+    setState(() => _edit = false);
+    if (p == null) return;
+    widget.on((p / widget.factor).clamp(widget.min, widget.max));
+  }
+
+  @override
+  Widget build(BuildContext context) => SizedBox(
+        width: sc(42),
+        height: sc(18),
+        child: _edit
+            ? Container(
+                decoration: BoxDecoration(
+                  color: widget.bg,
+                  borderRadius: BorderRadius.circular(sc(6)),
+                  border: Border.all(color: widget.accent.withOpacity(0.6)),
+                ),
+                child: TextField(
+                  controller: _c,
+                  autofocus: true,
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                      fontSize: 9,
+                      color: widget.textColor,
+                      fontWeight: FontWeight.w700),
+                  decoration: const InputDecoration(
+                    isDense: true,
+                    border: InputBorder.none,
+                    contentPadding: EdgeInsets.zero,
+                  ),
+                  onSubmitted: (_) => _commit(),
+                  onTapOutside: (_) => _commit(),
+                ),
+              )
+            : GestureDetector(
+                onTap: () {
+                  _c.text = widget.text.replaceAll(RegExp(r'[^0-9.,]'), '');
+                  setState(() => _edit = true);
+                },
+                child: Container(
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    color: widget.bg,
+                    borderRadius: BorderRadius.circular(sc(6)),
+                    border:
+                        Border.all(color: Colors.white.withOpacity(0.10)),
+                  ),
+                  child: Text(widget.text,
+                      style: TextStyle(
+                          fontSize: 9,
+                          color: widget.textColor,
+                          fontWeight: FontWeight.w700),
+                      overflow: TextOverflow.ellipsis),
+                ),
+              ),
+      );
 }
 
 // ============================================================
@@ -1265,13 +1511,16 @@ class _ColorPickerDialogState extends State<_ColorPickerDialog> {
                   .withOpacity(t.isDark ? 0.78 : 0.88),
               borderRadius: BorderRadius.circular(24),
               border: Border.all(
-                  color: Colors.white.withOpacity(t.isDark ? 0.15 : 0.6), width: 1),
+                  color: Colors.white.withOpacity(t.isDark ? 0.15 : 0.6),
+                  width: 1),
               boxShadow: [
                 BoxShadow(
                   color: Colors.black.withOpacity(0.45),
                   blurRadius: 40,
-                  offset: const Offset(0, 16)),
-                BoxShadow(color: t.accent.withOpacity(0.10), blurRadius: 30),
+                  offset: const Offset(0, 16),
+                ),
+                BoxShadow(
+                    color: t.accent.withOpacity(0.10), blurRadius: 30),
               ],
             ),
             child: Column(
@@ -1285,9 +1534,11 @@ class _ColorPickerDialogState extends State<_ColorPickerDialog> {
                     decoration: BoxDecoration(
                       color: t.accent.withOpacity(0.15),
                       borderRadius: BorderRadius.circular(9),
-                      border: Border.all(color: t.accent.withOpacity(0.4)),
+                      border:
+                          Border.all(color: t.accent.withOpacity(0.4)),
                     ),
-                    child: Icon(Icons.colorize_rounded, size: sc(15), color: t.accent),
+                    child: Icon(Icons.colorize_rounded,
+                        size: sc(15), color: t.accent),
                   ),
                   SizedBox(width: sc(10)),
                   Expanded(
@@ -1304,8 +1555,13 @@ class _ColorPickerDialogState extends State<_ColorPickerDialog> {
                     decoration: BoxDecoration(
                       color: _full,
                       shape: BoxShape.circle,
-                      border: Border.all(color: Colors.white.withOpacity(0.3)),
-                      boxShadow: [BoxShadow(color: _full.withOpacity(0.5), blurRadius: 10)],
+                      border: Border.all(
+                          color: Colors.white.withOpacity(0.3)),
+                      boxShadow: [
+                        BoxShadow(
+                            color: _full.withOpacity(0.5),
+                            blurRadius: 10)
+                      ],
                     ),
                   ),
                 ]),
@@ -1326,11 +1582,14 @@ class _ColorPickerDialogState extends State<_ColorPickerDialog> {
                     controller: _hexC,
                     onSubmitted: _onHex,
                     style: TextStyle(
-                        color: t.text, fontSize: 12, fontFamily: 'monospace'),
+                        color: t.text,
+                        fontSize: 12,
+                        fontFamily: 'Consolas'),
                     decoration: InputDecoration(
                       isDense: true,
                       border: InputBorder.none,
-                      prefixIcon: Icon(Icons.tag_rounded, size: 14, color: t.accent),
+                      prefixIcon: Icon(Icons.tag_rounded,
+                          size: 14, color: t.accent),
                       contentPadding: EdgeInsets.symmetric(
                           horizontal: sc(10), vertical: sc(10)),
                     ),
@@ -1436,7 +1695,9 @@ class _ColorPickerDialogState extends State<_ColorPickerDialog> {
                         color: _solid,
                         border: Border.all(color: Colors.white, width: 2),
                         boxShadow: [
-                          BoxShadow(color: Colors.black.withOpacity(0.5), blurRadius: 8)
+                          BoxShadow(
+                              color: Colors.black.withOpacity(0.5),
+                              blurRadius: 8)
                         ],
                       ),
                     ),
@@ -1474,7 +1735,8 @@ class _ColorPickerDialogState extends State<_ColorPickerDialog> {
                       Color(0xFFFF0000),
                     ]),
                     borderRadius: BorderRadius.circular(999),
-                    border: Border.all(color: Colors.white.withOpacity(0.12)),
+                    border:
+                        Border.all(color: Colors.white.withOpacity(0.12)),
                   ),
                 ),
               ),
@@ -1492,7 +1754,9 @@ class _ColorPickerDialogState extends State<_ColorPickerDialog> {
                         color: HSVColor.fromAHSV(1, _h, 1, 1).toColor(),
                         border: Border.all(color: Colors.white, width: 2),
                         boxShadow: [
-                          BoxShadow(color: Colors.black.withOpacity(0.5), blurRadius: 6)
+                          BoxShadow(
+                              color: Colors.black.withOpacity(0.5),
+                              blurRadius: 6)
                         ],
                       ),
                     ),
@@ -1530,7 +1794,8 @@ class _ColorPickerDialogState extends State<_ColorPickerDialog> {
                       colors: [_solid.withOpacity(0), _solid],
                     ),
                     borderRadius: BorderRadius.circular(999),
-                    border: Border.all(color: Colors.white.withOpacity(0.12)),
+                    border:
+                        Border.all(color: Colors.white.withOpacity(0.12)),
                   ),
                 ),
               ),
@@ -1548,7 +1813,9 @@ class _ColorPickerDialogState extends State<_ColorPickerDialog> {
                         color: _full,
                         border: Border.all(color: Colors.white, width: 2),
                         boxShadow: [
-                          BoxShadow(color: Colors.black.withOpacity(0.5), blurRadius: 6)
+                          BoxShadow(
+                              color: Colors.black.withOpacity(0.5),
+                              blurRadius: 6)
                         ],
                       ),
                     ),
@@ -1606,7 +1873,10 @@ class _GlassSliderState extends State<_GlassSlider> {
           height: sc(24),
           child: Stack(children: [
             Positioned(
-              left: 0, right: 0, top: 0, bottom: 0,
+              left: 0,
+              right: 0,
+              top: 0,
+              bottom: 0,
               child: Center(
                 child: Container(
                   height: sc(6),
@@ -1618,7 +1888,10 @@ class _GlassSliderState extends State<_GlassSlider> {
               ),
             ),
             Positioned(
-              left: 0, right: 0, top: 0, bottom: 0,
+              left: 0,
+              right: 0,
+              top: 0,
+              bottom: 0,
               child: Align(
                 alignment: Alignment.centerLeft,
                 child: FractionallySizedBox(
@@ -1629,13 +1902,17 @@ class _GlassSliderState extends State<_GlassSlider> {
                       gradient: LinearGradient(
                         colors: widget.accent2 != null
                             ? [widget.accent, widget.accent2!]
-                            : [widget.accent.withOpacity(0.7), widget.accent],
+                            : [
+                                widget.accent.withOpacity(0.7),
+                                widget.accent
+                              ],
                       ),
                       borderRadius: BorderRadius.circular(999),
                       boxShadow: [
                         BoxShadow(
                           color: widget.accent.withOpacity(0.45),
-                          blurRadius: _drag ? sc(12) : sc(6)),
+                          blurRadius: _drag ? sc(12) : sc(6),
+                        ),
                       ],
                     ),
                   ),
@@ -1660,7 +1937,8 @@ class _GlassSliderState extends State<_GlassSlider> {
                     boxShadow: [
                       BoxShadow(
                         color: widget.accent.withOpacity(0.55),
-                        blurRadius: _drag ? sc(16) : sc(8)),
+                        blurRadius: _drag ? sc(16) : sc(8),
+                      ),
                     ],
                   ),
                 ),
@@ -1681,8 +1959,8 @@ class _CheckerPainter extends CustomPainter {
     final dark = Paint()..color = const Color(0xFF242424);
     for (var y = 0; y < size.height / s + 1; y++) {
       for (var x = 0; x < size.width / s + 1; x++) {
-        canvas.drawRect(
-            Rect.fromLTWH(x * s, y * s, s, s), (x + y) % 2 == 0 ? light : dark);
+        canvas.drawRect(Rect.fromLTWH(x * s, y * s, s, s),
+            (x + y) % 2 == 0 ? light : dark);
       }
     }
   }

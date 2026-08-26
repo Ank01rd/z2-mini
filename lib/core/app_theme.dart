@@ -46,16 +46,15 @@ class AppTheme {
       );
 
   factory AppTheme.light() => const AppTheme(
-        isDark: false,
-        bg: Color(0xFFEFF3F9),
-        surface: Color(0xFFFBFDFF),
-        card: Color(0xFFFFFFFF),
-        text: Color(0xFF101418),
-        accent: Color(0xFF2563EB),
-        border: Color(0x26000000),
-        buttonColor: Color(0xFF2563EB),
-        buttonTextColor: Color(0xFFFFFFFF),
-      );
+      isDark: false,
+      bg: Color(0xFFE8ECF1),
+      surface: Color(0xFFF3F5F8),
+      card: Color(0xFFFAFBFC),
+      text: Color(0xFF242B33),
+      accent: Color(0xFF3B82F6),
+      border: Color(0x1A000000),
+      buttonColor: Color(0xFF3B82F6),
+      buttonTextColor: Color(0xFFFFFFFF));
 
   AppTheme withAccent(Color c) => AppTheme(
         isDark: isDark, bg: bg, surface: surface, card: card, text: text,

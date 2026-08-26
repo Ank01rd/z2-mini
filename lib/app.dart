@@ -10,6 +10,7 @@ import 'ui/settings_page.dart';
 import 'ui/style/effects.dart';
 import 'ui/widgets/notify_bell.dart';
 import 'ui/widgets/boot_screen.dart';
+import 'core/sound_service.dart';
 import 'services/update_service.dart';
 import 'core/notify_service.dart';
 
@@ -37,7 +38,7 @@ class Z2MiniApp extends StatelessWidget {
         debugShowCheckedModeBanner: false,
         theme: ThemeData(
           useMaterial3: true,
-          fontFamily: UiSettings.fontMode.value == 1 ? 'monospace' : null,
+          fontFamily: UiSettings.fontMode.value == 1 ? 'Consolas' : null,
           scaffoldBackgroundColor: Colors.transparent,
           colorScheme: ColorScheme.fromSeed(
             seedColor: t.accent,
@@ -67,8 +68,12 @@ class _ShellState extends State<_Shell> with TickerProviderStateMixin {
   int _from = 0; // откуда анимируем
   bool _switching = false;
   bool _boot = true;
+  // 🔒 ключи: состояние Главной/Настроек не сбрасывается при перестройках
+  final GlobalKey _homeKey = GlobalKey();
+  final GlobalKey _settingsKey = GlobalKey();
   Timer? _autoTimer;
   final ValueNotifier<Offset> _par = ValueNotifier(Offset.zero);
+  bool _dragging = false; // 🔒 пока тащим ползунок — параллакс спит
 
   late final AnimationController _pageCtrl = AnimationController(
     vsync: this,
@@ -101,6 +106,7 @@ class _ShellState extends State<_Shell> with TickerProviderStateMixin {
     NotifyService.push(
       'Доступно обновление ${c.release!.version} — тапни, чтобы установить',
       icon: Icons.system_update_rounded,
+      soundEvent: 'update',
       onTap: () => UpdateService.startUpdate(c.release!),
     );
   }
@@ -148,8 +154,11 @@ class _ShellState extends State<_Shell> with TickerProviderStateMixin {
   @override
   Widget build(BuildContext context) {
     return Listener(
+      onPointerDown: (_) => _dragging = true,
+      onPointerUp: (_) => _dragging = false,
+      onPointerCancel: (_) => _dragging = false,
       onPointerMove: (e) {
-        if (!UiSettings.parallax.value) {
+        if (!UiSettings.parallax.value || _dragging) {
           if (_par.value != Offset.zero) _par.value = Offset.zero;
           return;
         }
@@ -174,23 +183,23 @@ class _ShellState extends State<_Shell> with TickerProviderStateMixin {
               builder: (ctx, off, _) => ValueListenableBuilder<bool>(
                 valueListenable: UiSettings.parallax,
                 // ⚡ нет параллакса → нет Transform: фон рисуется 1:1
-                builder: (ctx, px, _) => px
-                    ? Transform.translate(
-                        offset: Offset(off.dx * -sc(120), off.dy * -sc(80)),
-                        child: Transform.scale(
-                          scale: 1.15,
-                          child: LiveBackground(
-                            color: UiSettings.bgColor.value ?? t.accent,
-                            speed: UiSettings.auroraSpeed.value,
-                            style: UiSettings.bgStyle.value,
-                          ),
+              builder: (ctx, px, _) => px
+                  ? Transform.translate(
+                      offset: Offset(off.dx * -sc(120), off.dy * -sc(80)),
+                      child: Transform.scale(
+                        scale: 1.15,
+                        child: LiveBackground(
+                          color: UiSettings.bgColor.value ?? t.accent,
+                          speed: UiSettings.auroraSpeed.value,
+                          style: UiSettings.bgStyle.value,
                         ),
-                      )
-                    : LiveBackground(
-                        color: UiSettings.bgColor.value ?? t.accent,
-                        speed: UiSettings.auroraSpeed.value,
-                        style: UiSettings.bgStyle.value,
                       ),
+                    )
+                  : LiveBackground(
+                      color: UiSettings.bgColor.value ?? t.accent,
+                      speed: UiSettings.auroraSpeed.value,
+                      style: UiSettings.bgStyle.value,
+                    ),
               ),
             );
           }),
@@ -235,49 +244,31 @@ class _ShellState extends State<_Shell> with TickerProviderStateMixin {
       thickness: 1,
       color: Colors.white.withOpacity(t.isDark ? 0.10 : 0.35));
 
-  // ⚡ Обе страницы смонтированы НАВСЕГДА (ни одного remount при переходе).
-  //    Анимация = чистый Transform.translate: GPU просто сдвигает слои.
-  //    В простое — никаких трансформаций, хит-тест идеальный.
-  Widget _content() => Stack(children: [
+      Widget _content() => Stack(children: [
         Positioned.fill(
           child: ClipRect(
             child: RepaintBoundary(
-              child: LayoutBuilder(
-                builder: (ctx, c) {
-                  final h = c.maxHeight;
-                  return OverflowBox(
-                    alignment: Alignment.topLeft,
-                    minWidth: c.maxWidth,
-                    maxWidth: c.maxWidth,
-                    minHeight: 0,
-                    maxHeight: h * 2,
-                    child: AnimatedBuilder(
-                      animation: _pageCtrl,
-                      child: SizedBox(
-                        height: h * 2,
-                        child: Stack(children: [
-                          Positioned(
-                              left: 0, right: 0, top: 0, height: h,
-                              child: HomePage(theme: t)),
-                          Positioned(
-                              left: 0, right: 0, top: h, height: h,
-                              child: SettingsPage(theme: t)),
-                        ]),
-                      ),
-                      builder: (ctx, child) {
-                        final double pos = _switching
-                            ? _from +
-                                (_page - _from) *
-                                    _easeInOutCubic(
-                                        _pageCtrl.value.clamp(0.0, 1.0))
-                            : _page.toDouble();
-                        return Transform.translate(
-                          offset: Offset(0, -pos * h),
-                          child: child,
-                        );
-                      },
+              child: AnimatedBuilder(
+                animation: _pageCtrl,
+                builder: (ctx, _) {
+                  final double pos = _switching
+                      ? _from +
+                          (_page - _from) *
+                              _easeInOutCubic(
+                                  _pageCtrl.value.clamp(0.0, 1.0))
+                      : _page.toDouble();
+                  return Stack(children: [
+                    IgnorePointer(
+                      ignoring: pos > 0.5,
+                      child: Opacity(
+                          opacity: 1 - pos, child: HomePage(theme: t)),
                     ),
-                  );
+                    IgnorePointer(
+                      ignoring: pos < 0.5,
+                      child: Opacity(
+                          opacity: pos, child: SettingsPage(theme: t)),
+                    ),
+                  ]);
                 },
               ),
             ),
@@ -347,7 +338,10 @@ class _ShellState extends State<_Shell> with TickerProviderStateMixin {
     final active = _page == i;
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
-      onTap: () => _go(i),
+      onTap: () {
+        SoundService.click();
+        _go(i);
+      },
       child: MouseRegion(
         cursor: SystemMouseCursors.click,
         child: AnimatedContainer(
@@ -428,7 +422,10 @@ class _WinBtnState extends State<_WinBtn> {
       onExit: (_) => setState(() => hovered = false),
       cursor: SystemMouseCursors.click,
       child: GestureDetector(
-        onTap: widget.onPressed,
+        onTap: () {
+          SoundService.click();
+          widget.onPressed();
+        },
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 170),
           width: sc(42),
