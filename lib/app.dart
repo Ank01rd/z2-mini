@@ -64,21 +64,15 @@ class _Shell extends StatefulWidget {
 }
 
 class _ShellState extends State<_Shell> with TickerProviderStateMixin {
-  int _page = 0; // целевая
-  int _from = 0; // откуда анимируем
-  bool _switching = false;
+  int _page = 0;
   bool _boot = true;
-  // 🔒 ключи: состояние Главной/Настроек не сбрасывается при перестройках
   final GlobalKey _homeKey = GlobalKey();
   final GlobalKey _settingsKey = GlobalKey();
   Timer? _autoTimer;
   final ValueNotifier<Offset> _par = ValueNotifier(Offset.zero);
-  bool _dragging = false; // 🔒 пока тащим ползунок — параллакс спит
+  bool _dragging = false;
+  int _dir = 1; // направление перехода (как в про)
 
-  late final AnimationController _pageCtrl = AnimationController(
-    vsync: this,
-    duration: const Duration(milliseconds: 340),
-  );
 
   AppTheme get t => widget.t;
 
@@ -91,18 +85,12 @@ class _ShellState extends State<_Shell> with TickerProviderStateMixin {
     _applyAutoTheme();
     _autoTimer =
         Timer.periodic(const Duration(seconds: 30), (_) => _applyAutoTheme());
-    _pageCtrl.addStatusListener((s) {
-      if (s == AnimationStatus.completed && mounted) {
-        setState(() => _switching = false);
-      }
-    });
-    // 🔄 тихая проверка обновлений после запуска
     Future.delayed(const Duration(seconds: 4), _checkUpdates);
   }
 
   Future<void> _checkUpdates() async {
     final c = await UpdateService.check();
-    if (c.release == null || !mounted) return; // тихо: нет обновы или ошибка
+    if (c.release == null || !mounted) return;
     NotifyService.push(
       'Доступно обновление ${c.release!.version} — тапни, чтобы установить',
       icon: Icons.system_update_rounded,
@@ -114,41 +102,30 @@ class _ShellState extends State<_Shell> with TickerProviderStateMixin {
   @override
   void dispose() {
     _autoTimer?.cancel();
-    _pageCtrl.dispose();
     _par.dispose();
     super.dispose();
   }
 
   void _applyAutoTheme() {
     if (!UiSettings.autoTheme.value) return;
-    final h = DateTime.now().hour;
-    final dark = h >= 19 || h < 7;
+    final now = DateTime.now();
+    final m = now.hour * 60 + now.minute;
+    final from = UiSettings.themeFrom.value;
+    final to = UiSettings.themeTo.value;
+    // 🌙 диапазон может идти через полночь (19:00→07:00) или быть дневным
+    final dark = from <= to ? (m >= from && m < to) : (m >= from || m < to);
     if (UiSettings.isDark.value != dark) {
       UiSettings.isDark.value = dark;
       UiSettings.save();
     }
   }
 
-  static double _easeInOutCubic(double x) {
-    final p = -2 * x + 2;
-    return x < 0.5 ? 4 * x * x * x : 1 - (p * p * p) / 2;
-  }
-
   void _go(int i) {
     if (i == _page) return;
     setState(() {
-      _from = _page;
+      _dir = i > _page ? 1 : -1;
       _page = i;
-      _switching = true;
     });
-    if (!UiSettings.animationsEnabled.value) {
-      _pageCtrl.stop();
-      setState(() => _switching = false);
-      return;
-    }
-    final speed = UiSettings.animSpeed.value.clamp(0.5, 2.0);
-    _pageCtrl.duration = Duration(milliseconds: (340 / speed).round());
-    _pageCtrl.forward(from: 0);
   }
 
   @override
@@ -182,24 +159,25 @@ class _ShellState extends State<_Shell> with TickerProviderStateMixin {
               valueListenable: _par,
               builder: (ctx, off, _) => ValueListenableBuilder<bool>(
                 valueListenable: UiSettings.parallax,
-                // ⚡ нет параллакса → нет Transform: фон рисуется 1:1
-              builder: (ctx, px, _) => px
-                  ? Transform.translate(
-                      offset: Offset(off.dx * -sc(120), off.dy * -sc(80)),
-                      child: Transform.scale(
-                        scale: 1.15,
-                        child: LiveBackground(
-                          color: UiSettings.bgColor.value ?? t.accent,
-                          speed: UiSettings.auroraSpeed.value,
-                          style: UiSettings.bgStyle.value,
+                builder: (ctx, px, _) => px
+                    ? Transform.translate(
+                        offset: Offset(off.dx * -sc(120), off.dy * -sc(80)),
+                        child: Transform.scale(
+                          scale: 1.15,
+                          child: LiveBackground(
+                            color: UiSettings.bgColor.value ?? t.accent,
+                            speed: UiSettings.auroraSpeed.value,
+                            style: UiSettings.bgStyle.value,
+                            density: UiSettings.bgDensity.value,
+                          ),
                         ),
+                      )
+                    : LiveBackground(
+                        color: UiSettings.bgColor.value ?? t.accent,
+                        speed: UiSettings.auroraSpeed.value,
+                        style: UiSettings.bgStyle.value,
+                        density: UiSettings.bgDensity.value,
                       ),
-                    )
-                  : LiveBackground(
-                      color: UiSettings.bgColor.value ?? t.accent,
-                      speed: UiSettings.auroraSpeed.value,
-                      style: UiSettings.bgStyle.value,
-                    ),
               ),
             );
           }),
@@ -244,32 +222,36 @@ class _ShellState extends State<_Shell> with TickerProviderStateMixin {
       thickness: 1,
       color: Colors.white.withOpacity(t.isDark ? 0.10 : 0.35));
 
-      Widget _content() => Stack(children: [
+        Widget _content() => Stack(children: [
         Positioned.fill(
           child: ClipRect(
             child: RepaintBoundary(
-              child: AnimatedBuilder(
-                animation: _pageCtrl,
-                builder: (ctx, _) {
-                  final double pos = _switching
-                      ? _from +
-                          (_page - _from) *
-                              _easeInOutCubic(
-                                  _pageCtrl.value.clamp(0.0, 1.0))
-                      : _page.toDouble();
-                  return Stack(children: [
-                    IgnorePointer(
-                      ignoring: pos > 0.5,
-                      child: Opacity(
-                          opacity: 1 - pos, child: HomePage(theme: t)),
-                    ),
-                    IgnorePointer(
-                      ignoring: pos < 0.5,
-                      child: Opacity(
-                          opacity: pos, child: SettingsPage(theme: t)),
-                    ),
-                  ]);
+              // 🎯 как в про: AnimatedSwitcher + лёгкий сдвиг + фейд.
+              //    В покое в дереве ОДНА страница → кнопки всегда живые
+              child: AnimatedSwitcher(
+                duration: UiSettings.animationsEnabled.value
+                    ? Duration(
+                        milliseconds:
+                            (300 / UiSettings.animSpeed.value.clamp(0.5, 2.0))
+                                .round())
+                    : Duration.zero,
+                transitionBuilder: (child, anim) {
+                  final cur =
+                      CurvedAnimation(parent: anim, curve: Curves.easeOutCubic);
+                  return SlideTransition(
+                    position: Tween<Offset>(
+                      begin: Offset(0, 0.08 * _dir),
+                      end: Offset.zero,
+                    ).animate(cur),
+                    child: FadeTransition(opacity: cur, child: child),
+                  );
                 },
+                child: KeyedSubtree(
+                  key: ValueKey(_page),
+                  child: _page == 0
+                      ? HomePage(theme: t)
+                      : SettingsPage(theme: t),
+                ),
               ),
             ),
           ),
@@ -309,6 +291,7 @@ class _ShellState extends State<_Shell> with TickerProviderStateMixin {
         ),
       );
 
+  // 🎯 сайдбар теперь слушает compactSidebar и плавно меняет ширину
   Widget _sidebar() => ValueListenableBuilder<bool>(
         valueListenable: UiSettings.realBlur,
         builder: (ctx, real, _) => ClipRect(
@@ -321,22 +304,74 @@ class _ShellState extends State<_Shell> with TickerProviderStateMixin {
         ),
       );
 
-  Widget _sidebarBody() => Container(
-        width: sc(84),
-        color: (t.isDark ? const Color(0xFF0B0E14) : Colors.white)
-            .withOpacity(t.isDark ? 0.35 : 0.5),
-        child: Column(children: [
-          const Spacer(),
-          _item(0, Icons.home_rounded, tr('Главная', 'Home')),
-          SizedBox(height: sc(14)),
-          _item(1, Icons.settings_rounded, tr('Настройки', 'Settings')),
-          const Spacer(),
-        ]),
+  Widget _sidebarBody() => ValueListenableBuilder<bool>(
+        valueListenable: UiSettings.compactSidebar,
+        builder: (ctx, compact, _) {
+          final w = compact ? sc(56) : sc(84);
+          final item = compact ? sc(40) : sc(60);
+          final gap = sc(14);
+          return AnimatedContainer(
+            duration: const Duration(milliseconds: 260),
+            curve: Curves.easeOutCubic,
+            width: w,
+            color: (t.isDark ? const Color(0xFF0B0E14) : Colors.white)
+                .withOpacity(t.isDark ? 0.35 : 0.5),
+            child: Column(children: [
+              const Spacer(),
+              SizedBox(
+                height: item * 2 + gap,
+                child: Stack(children: [
+                  // 💊 светящийся индикатор скользит между пунктами — как в про
+                  AnimatedPositioned(
+                    duration: t.animDur,
+                    curve: t.animCurve,
+                    top: _page == 0 ? 0 : item + gap,
+                    left: 0,
+                    right: 0,
+                    child: Center(
+                      child: Container(
+                        width: item,
+                        height: item,
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(16),
+                          gradient: LinearGradient(
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                            colors: [
+                              t.accent.withOpacity(0.28),
+                              t.accent.withOpacity(0.12),
+                            ],
+                          ),
+                          border:
+                              Border.all(color: t.accent.withOpacity(0.5)),
+                          boxShadow: [
+                            BoxShadow(
+                                color: t.accent.withOpacity(0.25),
+                                blurRadius: 12,
+                                offset: const Offset(0, 4)),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                  Column(children: [
+                    _item(0, Icons.home_rounded, tr('Главная', 'Home'),
+                        compact),
+                    SizedBox(height: gap),
+                    _item(1, Icons.settings_rounded,
+                        tr('Настройки', 'Settings'), compact),
+                  ]),
+                ]),
+              ),
+              const Spacer(),
+            ]),
+          );
+        },
       );
 
-  Widget _item(int i, IconData ic, String label) {
+  Widget _item(int i, IconData ic, String label, bool compact) {
     final active = _page == i;
-    return GestureDetector(
+    final btn = GestureDetector(
       behavior: HitTestBehavior.opaque,
       onTap: () {
         SoundService.click();
@@ -347,46 +382,40 @@ class _ShellState extends State<_Shell> with TickerProviderStateMixin {
         child: AnimatedContainer(
           duration: t.animDur,
           curve: t.animCurve,
-          width: sc(60),
-          height: sc(60),
-          decoration: BoxDecoration(
-            gradient: active
-                ? LinearGradient(
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                    colors: [
-                      t.accent.withOpacity(0.28),
-                      t.accent.withOpacity(0.12),
-                    ],
-                  )
-                : null,
-            color: active ? null : Colors.transparent,
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(
-                color: active ? t.accent.withOpacity(0.5) : Colors.transparent),
-            boxShadow: active
-                ? [
-                    BoxShadow(
-                        color: t.accent.withOpacity(0.25),
-                        blurRadius: 12,
-                        offset: const Offset(0, 4)),
-                  ]
-                : null,
-          ),
+          width: compact ? sc(40) : sc(60),
+          height: compact ? sc(40) : sc(60),
           child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
             Icon(ic,
-                size: sc(19),
+                size: sc(compact ? 17 : 19),
                 color: active ? t.accent : t.text.withOpacity(0.55)),
-            const SizedBox(height: 3),
-            Text(label,
-                style: TextStyle(
-                    fontSize: sc(9),
-                    fontWeight: FontWeight.w700,
-                    color: active ? t.accent : t.text.withOpacity(0.55))),
+            if (!compact) ...[
+              const SizedBox(height: 3),
+              Text(label,
+                  style: TextStyle(
+                      fontSize: sc(9),
+                      fontWeight: FontWeight.w700,
+                      color: active ? t.accent : t.text.withOpacity(0.55))),
+            ],
           ]),
         ),
       ),
     );
+    return compact
+        ? Tooltip(
+            message: label,
+            preferBelow: false,
+            decoration: BoxDecoration(
+              color: Colors.black.withOpacity(0.92),
+              borderRadius: BorderRadius.circular(sc(8)),
+              border: Border.all(color: t.accent.withOpacity(0.4)),
+            ),
+            textStyle: TextStyle(
+                color: Colors.white,
+                fontSize: sc(11),
+                fontWeight: FontWeight.w600),
+            child: btn,
+          )
+        : btn;
   }
 }
 

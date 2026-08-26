@@ -1,4 +1,6 @@
 import 'dart:async';
+import 'dart:math' as math;
+import 'package:flutter/gestures.dart';
 import 'dart:ui';
 import 'dart:io';
 import 'package:url_launcher/url_launcher.dart';
@@ -24,8 +26,10 @@ class SettingsPage extends StatefulWidget {
 
 class _SettingsPageState extends State<SettingsPage>
     with SingleTickerProviderStateMixin {
-  static int _cat = 0;
+  static int _cat = 0; // 🧯 static: не сбрасывается при пересоздании страницы
   static int _shown = 0;
+  int _logoTaps = 0;
+  Timer? _logoTimer;
   double _offsetY = 0;
   double _contentOp = 1;
   Duration _slideDur = Duration.zero;
@@ -158,31 +162,41 @@ class _SettingsPageState extends State<SettingsPage>
     );
   }
 
-  Widget _rail() => ClipRect(
-        child: BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
-          child: Container(
-            width: sc(190),
-            color: (t.isDark ? const Color(0xFF0B0E14) : Colors.white)
-                .withOpacity(t.isDark ? 0.35 : 0.5),
-            child: LayoutBuilder(
-              builder: (ctx, c) => SingleChildScrollView(
-                child: ConstrainedBox(
-                  constraints: BoxConstraints(minHeight: c.maxHeight),
-                  child: IntrinsicHeight(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        for (var i = 0; i < _cats.length; i++) ...[
-                          if (i > 0) SizedBox(height: sc(6)),
-                          Padding(
-                            padding: EdgeInsets.symmetric(horizontal: sc(10)),
-                            child: _catBtn(i),
-                          ),
-                        ],
-                      ],
-                    ),
-                  ),
+  Widget _rail() => ValueListenableBuilder<bool>(
+        valueListenable: UiSettings.compactSidebar,
+        builder: (ctx, compact, _) => ClipRect(
+              child: UiSettings.realBlur.value
+                  ? BackdropFilter(
+                      filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
+                      child: _railBody(compact),
+                    )
+                  : _railBody(compact),
+            ),
+      );
+
+  Widget _railBody(bool compact) => AnimatedContainer(
+        duration: const Duration(milliseconds: 260),
+        curve: Curves.easeOutCubic,
+        width: compact ? sc(60) : sc(190),
+        color: (t.isDark ? const Color(0xFF0B0E14) : Colors.white)
+            .withOpacity(t.isDark ? 0.35 : 0.5),
+        child: LayoutBuilder(
+          builder: (ctx, c) => SingleChildScrollView(
+            child: ConstrainedBox(
+              constraints: BoxConstraints(minHeight: c.maxHeight),
+              child: IntrinsicHeight(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    for (var i = 0; i < _cats.length; i++) ...[
+                      if (i > 0) SizedBox(height: sc(6)),
+                      Padding(
+                        padding: EdgeInsets.symmetric(
+                            horizontal: compact ? sc(8) : sc(10)),
+                        child: _catBtn(i, compact),
+                      ),
+                    ],
+                  ],
                 ),
               ),
             ),
@@ -211,9 +225,10 @@ class _SettingsPageState extends State<SettingsPage>
     }
   }
 
-  Widget _catBtn(int i) {
+  Widget _catBtn(int i, bool compact) {
     final active = _cat == i;
-    return GestureDetector(
+    final btn = GestureDetector(
+      behavior: HitTestBehavior.opaque,
       onTap: () {
         SoundService.click();
         _goCat(i);
@@ -221,28 +236,44 @@ class _SettingsPageState extends State<SettingsPage>
       child: AnimatedContainer(
         duration: t.animDur,
         curve: t.animCurve,
-        padding: EdgeInsets.symmetric(horizontal: sc(12), vertical: sc(10)),
+        padding: EdgeInsets.symmetric(
+            horizontal: compact ? sc(10) : sc(12), vertical: sc(10)),
         decoration: BoxDecoration(
           color: active ? t.accent.withOpacity(0.18) : Colors.transparent,
           borderRadius: BorderRadius.circular(14),
           border: Border.all(
               color: active ? t.accent.withOpacity(0.5) : Colors.transparent),
         ),
-        child: Row(children: [
-          Icon(_cats[i][0] as IconData,
-              size: sc(16), color: active ? t.accent : t.text.withOpacity(0.5)),
-          SizedBox(width: sc(10)),
-          Flexible(
-            child: Text(tr(_cats[i][1] as String, _cats[i][2] as String),
-                style: TextStyle(
-                    fontSize: sc(12),
-                    fontWeight: FontWeight.w700,
-                    color: active ? t.text : t.text.withOpacity(0.6)),
-                overflow: TextOverflow.ellipsis),
-          ),
-        ]),
+        child: compact
+            ? Center(
+                child: Icon(_cats[i][0] as IconData,
+                    size: sc(16),
+                    color: active ? t.accent : t.text.withOpacity(0.5)),
+              )
+            : Row(children: [
+                Icon(_cats[i][0] as IconData,
+                    size: sc(16),
+                    color: active ? t.accent : t.text.withOpacity(0.5)),
+                SizedBox(width: sc(10)),
+                Flexible(
+                  child: Text(tr(_cats[i][1] as String, _cats[i][2] as String),
+                      style: TextStyle(
+                          fontSize: sc(12),
+                          fontWeight: FontWeight.w700,
+                          color: active ? t.text : t.text.withOpacity(0.6)),
+                      overflow: TextOverflow.ellipsis),
+                ),
+              ]),
       ),
     );
+    return compact
+        ? Tooltip(
+            message: tr(_cats[i][1] as String, _cats[i][2] as String),
+            preferBelow: false,
+            waitDuration: const Duration(milliseconds: 350),
+            child: btn,
+          )
+        : btn;
   }
 
   // ── вкладки ────────────────────────────────────────────────
@@ -255,6 +286,44 @@ class _SettingsPageState extends State<SettingsPage>
             UiSettings.autoTheme.value = !UiSettings.autoTheme.value;
             UiSettings.save();
           }, icon: Icons.schedule_rounded),
+          if (UiSettings.autoTheme.value) ...[
+            _sep(),
+            Padding(
+              padding: EdgeInsets.symmetric(horizontal: sc(14)),
+              child: Row(children: [
+                Icon(Icons.dark_mode_rounded, size: 16, color: t.accent),
+                SizedBox(width: sc(8)),
+                Expanded(
+                  child: Text(tr('Тёмная с', 'Dark from'),
+                      style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: t.text)),
+                ),
+                _TimeWheel(
+                  theme: t,
+                  value: UiSettings.themeFrom.value,
+                  on: (v) {
+                    UiSettings.themeFrom.value = v;
+                    UiSettings.save();
+                  },
+                ),
+                SizedBox(width: sc(8)),
+                Text(tr('до', 'to'),
+                    style: TextStyle(
+                        fontSize: 12, color: t.text.withOpacity(0.6))),
+                SizedBox(width: sc(8)),
+                _TimeWheel(
+                  theme: t,
+                  value: UiSettings.themeTo.value,
+                  on: (v) {
+                    UiSettings.themeTo.value = v;
+                    UiSettings.save();
+                  },
+                ),
+              ]),
+            ),
+          ],
         ]),
         _gap(),
         _card(
@@ -324,6 +393,13 @@ class _SettingsPageState extends State<SettingsPage>
               UiSettings.sidebarRight.value = !UiSettings.sidebarRight.value;
               UiSettings.save();
             }, icon: Icons.flip_to_front_rounded),
+            _sep(),
+            _switch(tr('Компактный сайдбар', 'Compact sidebar'),
+                UiSettings.compactSidebar.value, () {
+              UiSettings.compactSidebar.value =
+                  !UiSettings.compactSidebar.value;
+              UiSettings.save();
+            }, icon: Icons.unfold_less_rounded),
             _sep(),
             Row(children: [
               _chip(tr('Системный шрифт', 'System'),
@@ -398,8 +474,7 @@ class _SettingsPageState extends State<SettingsPage>
               UiSettings.animSpeed.value = v;
               UiSettings.save();
             },
-                suffix:
-                    'x${UiSettings.animSpeed.value.toStringAsFixed(1)}'),
+                suffix: 'x${UiSettings.animSpeed.value.toStringAsFixed(1)}'),
             _sep(),
             _switch(tr('Анимации', 'Animations'),
                 UiSettings.animationsEnabled.value, () {
@@ -513,18 +588,17 @@ class _SettingsPageState extends State<SettingsPage>
               _sep(),
               ValueListenableBuilder<int>(
                 valueListenable: UiSettings.bgStyle,
-                builder: (ctx, st, _) => Wrap(
-                  spacing: sc(6),
-                  runSpacing: sc(6),
-                  children: [
-                    _bgChip(0, Icons.cloud_rounded, tr('Аврора', 'Aurora'), st),
-                    _bgChip(1, Icons.waves_rounded, tr('Волны', 'Waves'), st),
-                    _bgChip(2, Icons.nightlight_rounded, tr('Звёзды', 'Stars'), st),
-                    _bgChip(3, Icons.flashlight_on_rounded, tr('Моя волна', 'My Wave'), st),
-                    _bgChip(4, Icons.filter_drama_rounded, tr('Облака', 'Clouds'), st),
-                    _bgChip(5, Icons.sailing_rounded, tr('Утки', 'Ducks'), st),
-                    _bgChip(6, Icons.pets_rounded, tr('Лягушки', 'Frogs'), st),
-                  ],
+                builder: (ctx, st, _) => GridView.builder(
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount: 4,
+                    mainAxisSpacing: sc(6),
+                    crossAxisSpacing: sc(6),
+                    childAspectRatio: 2.2,
+                  ),
+                  itemCount: _bgStyles.length,
+                  itemBuilder: (c, i) => _bgCell(i, st),
                 ),
               ),
             ]),
@@ -538,8 +612,14 @@ class _SettingsPageState extends State<SettingsPage>
                 UiSettings.auroraSpeed.value = v;
                 UiSettings.save();
               },
-                  suffix:
-                      'x${UiSettings.auroraSpeed.value.toStringAsFixed(1)}'),
+                  suffix: 'x${UiSettings.auroraSpeed.value.toStringAsFixed(1)}'),
+              _sep(),
+              _slider(tr('Плотность фона', 'Background density'),
+                  UiSettings.bgDensity.value, 0.4, 2.0, (v) {
+                UiSettings.bgDensity.value = v;
+                UiSettings.save();
+              },
+                  suffix: 'x${UiSettings.bgDensity.value.toStringAsFixed(1)}'),
               _sep(),
               _slider(
                   tr('Виньетка', 'Vignette'), UiSettings.vignette.value, 0.0, 0.8,
@@ -771,20 +851,23 @@ class _SettingsPageState extends State<SettingsPage>
             border: Border.all(color: t.accent.withOpacity(0.3)),
           ),
           child: Column(children: [
-            Container(
-              width: sc(68),
-              height: sc(68),
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                border:
-                    Border.all(color: t.accent.withOpacity(0.5), width: 1.5),
-                boxShadow: [
-                  BoxShadow(
-                      color: t.accent.withOpacity(0.4), blurRadius: sc(26)),
-                ],
+            GestureDetector(
+              onTap: _logoTap,
+              child: Container(
+                width: sc(68),
+                height: sc(68),
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  border:
+                      Border.all(color: t.accent.withOpacity(0.5), width: 1.5),
+                  boxShadow: [
+                    BoxShadow(
+                        color: t.accent.withOpacity(0.4), blurRadius: sc(26)),
+                  ],
+                ),
+                child: ClipOval(
+                    child: Image.asset('assets/z2m_black_logo_256.png')),
               ),
-              child: ClipOval(
-                  child: Image.asset('assets/z2m_black_logo_256.png')),
             ),
             SizedBox(height: sc(14)),
             Text('Z2 Mini',
@@ -801,7 +884,8 @@ class _SettingsPageState extends State<SettingsPage>
                 borderRadius: BorderRadius.circular(999),
                 border: Border.all(color: t.accent.withOpacity(0.4)),
               ),
-              child: Text('v${UpdateService.currentVersion} · Liquid Glass Edition',
+              child: Text(
+                  'v${UpdateService.currentVersion} · Liquid Glass Edition',
                   style: TextStyle(
                       fontSize: sc(10),
                       fontWeight: FontWeight.w700,
@@ -996,6 +1080,22 @@ class _SettingsPageState extends State<SettingsPage>
         icon: Icons.folder_rounded);
   }
 
+  // 🥚 пасхалка: 5 тапов по логотипу → конфетти + кря!
+  void _logoTap() {
+    _logoTaps++;
+    _logoTimer?.cancel();
+    _logoTimer = Timer(const Duration(seconds: 2), () => _logoTaps = 0);
+    if (_logoTaps >= 5) {
+      _logoTaps = 0;
+      SoundService.play('complete');
+      showDialog(
+        context: context,
+        barrierColor: Colors.transparent,
+        builder: (c) => const _EasterEggDialog(),
+      );
+    }
+  }
+
   Widget _iconBtn(IconData ic, VoidCallback onTap, {bool click = true}) =>
       GestureDetector(
         behavior: HitTestBehavior.opaque,
@@ -1110,8 +1210,7 @@ class _SettingsPageState extends State<SettingsPage>
         child: Row(children: [
           SizedBox(
             width: sc(120),
-            child:
-                Text(label, style: TextStyle(fontSize: 12, color: t.text)),
+            child: Text(label, style: TextStyle(fontSize: 12, color: t.text)),
           ),
           Expanded(
             child: _GlassSlider(
@@ -1290,7 +1389,21 @@ class _SettingsPageState extends State<SettingsPage>
         ]),
       );
 
-  Widget _bgChip(int id, IconData ic, String label, int current) {
+  static const List<List<Object>> _bgStyles = [
+    [Icons.cloud_rounded, 'Аврора', 'Aurora'],
+    [Icons.waves_rounded, 'Волны', 'Waves'],
+    [Icons.nightlight_rounded, 'Звёзды', 'Stars'],
+    [Icons.flashlight_on_rounded, 'Моя волна', 'My Wave'],
+    [Icons.filter_drama_rounded, 'Облака', 'Clouds'],
+    [Icons.sailing_rounded, 'Утки', 'Ducks'],
+    [Icons.pets_rounded, 'Лягушки', 'Frogs'],
+    [Icons.grid_on_rounded, 'Точки', 'Dots'],
+    [Icons.opacity_rounded, 'Аквариум', 'Aquarium'],
+  ];
+
+  // 🎯 ячейка сетки стилей фона — все одного размера, ничего не «едет»
+  Widget _bgCell(int id, int current) {
+    final e = _bgStyles[id];
     final active = current == id;
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
@@ -1302,29 +1415,96 @@ class _SettingsPageState extends State<SettingsPage>
       child: AnimatedContainer(
         duration: t.animDur,
         curve: t.animCurve,
-        padding: EdgeInsets.symmetric(horizontal: sc(10), vertical: sc(9)),
+        padding: EdgeInsets.symmetric(horizontal: sc(6), vertical: sc(8)),
         decoration: BoxDecoration(
           color: active ? t.accent.withOpacity(0.8) : t.card.withOpacity(0.5),
-          borderRadius: BorderRadius.circular(999),
+          borderRadius: BorderRadius.circular(12),
           border: Border.all(
             color: active
                 ? t.accent
                 : Colors.white.withOpacity(t.isDark ? 0.10 : 0.5),
           ),
         ),
-        child: Row(mainAxisSize: MainAxisSize.min, children: [
-          Icon(ic,
+        child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+          Icon(e[0] as IconData,
               size: sc(13),
               color: active ? t.buttonTextColor : t.text.withOpacity(0.6)),
           SizedBox(width: sc(4)),
-          Text(label,
-              style: TextStyle(
-                  fontSize: sc(10),
-                  fontWeight: FontWeight.w700,
-                  color: active
-                      ? t.buttonTextColor
-                      : t.text.withOpacity(0.6))),
+          Flexible(
+            child: Text(tr(e[1] as String, e[2] as String),
+                style: TextStyle(
+                    fontSize: sc(9),
+                    fontWeight: FontWeight.w700,
+                    color: active
+                        ? t.buttonTextColor
+                        : t.text.withOpacity(0.6)),
+                overflow: TextOverflow.ellipsis),
+          ),
         ]),
+      ),
+    );
+  }
+} // ← закрытие _SettingsPageState
+
+// ============================================================
+// 🎛 Колёсико времени: 1 тик = 1 мин, с ускорением при долгой прокрутке
+// ============================================================
+class _TimeWheel extends StatefulWidget {
+  final AppTheme theme;
+  final int value; // минуты 0..1439
+  final ValueChanged<int> on;
+  const _TimeWheel({required this.theme, required this.value, required this.on});
+  @override
+  State<_TimeWheel> createState() => _TimeWheelState();
+}
+
+class _TimeWheelState extends State<_TimeWheel> {
+  int _combo = 0;
+  int _last = 0;
+
+  String _fmt(int v) =>
+      '${(v ~/ 60).toString().padLeft(2, '0')}:${(v % 60).toString().padLeft(2, '0')}';
+
+  void _wheel(double dy) {
+    final now = DateTime.now().millisecondsSinceEpoch;
+    // 🔥 пока крутишь без пауз — «раскручивается» маховик
+    _combo = (now - _last < 250) ? _combo + 1 : 0;
+    _last = now;
+    // 🚀 усиление: 1 мин → 5 → 15 → 60
+    final step = _combo < 6 ? 1 : _combo < 14 ? 5 : _combo < 26 ? 15 : 60;
+    final dir = dy < 0 ? 1 : -1;
+    widget.on((widget.value + dir * step + 1440) % 1440);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final t = widget.theme;
+    return Listener(
+      onPointerSignal: (e) {
+        if (e is PointerScrollEvent) _wheel(e.scrollDelta.dy);
+      },
+      child: Tooltip(
+        message: tr('Крути колёсико: 1 тик = 1 мин, с ускорением',
+            'Scroll: 1 tick = 1 min, accelerates'),
+        waitDuration: const Duration(milliseconds: 400),
+        child: Container(
+          padding: EdgeInsets.symmetric(horizontal: sc(12), vertical: sc(7)),
+          decoration: BoxDecoration(
+            color: Colors.black.withOpacity(t.isDark ? 0.35 : 0.06),
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(color: t.accent.withOpacity(0.4)),
+          ),
+          child: Row(mainAxisSize: MainAxisSize.min, children: [
+            Icon(Icons.schedule_rounded,
+                size: 13, color: t.accent.withOpacity(0.8)),
+            SizedBox(width: sc(6)),
+            Text(_fmt(widget.value),
+                style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w800,
+                    color: t.accent)),
+          ]),
+        ),
       ),
     );
   }
@@ -1406,8 +1586,7 @@ class _ValuePillState extends State<_ValuePill> {
                   decoration: BoxDecoration(
                     color: widget.bg,
                     borderRadius: BorderRadius.circular(sc(6)),
-                    border:
-                        Border.all(color: Colors.white.withOpacity(0.10)),
+                    border: Border.all(color: Colors.white.withOpacity(0.10)),
                   ),
                   child: Text(widget.text,
                       style: TextStyle(
@@ -1512,8 +1691,7 @@ class _ColorPickerDialogState extends State<_ColorPickerDialog> {
                   blurRadius: 40,
                   offset: const Offset(0, 16),
                 ),
-                BoxShadow(
-                    color: t.accent.withOpacity(0.10), blurRadius: 30),
+                BoxShadow(color: t.accent.withOpacity(0.10), blurRadius: 30),
               ],
             ),
             child: Column(
@@ -1527,8 +1705,7 @@ class _ColorPickerDialogState extends State<_ColorPickerDialog> {
                     decoration: BoxDecoration(
                       color: t.accent.withOpacity(0.15),
                       borderRadius: BorderRadius.circular(9),
-                      border:
-                          Border.all(color: t.accent.withOpacity(0.4)),
+                      border: Border.all(color: t.accent.withOpacity(0.4)),
                     ),
                     child: Icon(Icons.colorize_rounded,
                         size: sc(15), color: t.accent),
@@ -1548,12 +1725,9 @@ class _ColorPickerDialogState extends State<_ColorPickerDialog> {
                     decoration: BoxDecoration(
                       color: _full,
                       shape: BoxShape.circle,
-                      border: Border.all(
-                          color: Colors.white.withOpacity(0.3)),
+                      border: Border.all(color: Colors.white.withOpacity(0.3)),
                       boxShadow: [
-                        BoxShadow(
-                            color: _full.withOpacity(0.5),
-                            blurRadius: 10)
+                        BoxShadow(color: _full.withOpacity(0.5), blurRadius: 10)
                       ],
                     ),
                   ),
@@ -1575,14 +1749,12 @@ class _ColorPickerDialogState extends State<_ColorPickerDialog> {
                     controller: _hexC,
                     onSubmitted: _onHex,
                     style: TextStyle(
-                        color: t.text,
-                        fontSize: 12,
-                        fontFamily: 'Consolas'),
+                        color: t.text, fontSize: 12, fontFamily: 'Consolas'),
                     decoration: InputDecoration(
                       isDense: true,
                       border: InputBorder.none,
-                      prefixIcon: Icon(Icons.tag_rounded,
-                          size: 14, color: t.accent),
+                      prefixIcon:
+                          Icon(Icons.tag_rounded, size: 14, color: t.accent),
                       contentPadding: EdgeInsets.symmetric(
                           horizontal: sc(10), vertical: sc(10)),
                     ),
@@ -1728,8 +1900,7 @@ class _ColorPickerDialogState extends State<_ColorPickerDialog> {
                       Color(0xFFFF0000),
                     ]),
                     borderRadius: BorderRadius.circular(999),
-                    border:
-                        Border.all(color: Colors.white.withOpacity(0.12)),
+                    border: Border.all(color: Colors.white.withOpacity(0.12)),
                   ),
                 ),
               ),
@@ -1787,8 +1958,7 @@ class _ColorPickerDialogState extends State<_ColorPickerDialog> {
                       colors: [_solid.withOpacity(0), _solid],
                     ),
                     borderRadius: BorderRadius.circular(999),
-                    border:
-                        Border.all(color: Colors.white.withOpacity(0.12)),
+                    border: Border.all(color: Colors.white.withOpacity(0.12)),
                   ),
                 ),
               ),
@@ -1904,8 +2074,7 @@ class _GlassSliderState extends State<_GlassSlider> {
                       boxShadow: [
                         BoxShadow(
                           color: widget.accent.withOpacity(0.45),
-                          blurRadius: _drag ? sc(12) : sc(6),
-                        ),
+                          blurRadius: _drag ? sc(12) : sc(6)),
                       ],
                     ),
                   ),
@@ -1960,4 +2129,127 @@ class _CheckerPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant CustomPainter old) => false;
+}
+
+// ============================================================
+// 🥚 Пасхалка: конфетти + утка
+// ============================================================
+class _Conf {
+  final double x, delay, speed;
+  final int ci;
+  _Conf(this.x, this.delay, this.speed, this.ci);
+}
+
+class _ConfPainter extends CustomPainter {
+  final double t;
+  final List<_Conf> parts;
+  _ConfPainter(this.t, this.parts);
+  static const _cols = [
+    Color(0xFFB3E65C),
+    Color(0xFF60A5FA),
+    Color(0xFFFFD166),
+    Color(0xFFEF476F),
+    Color(0xFFFFFFFF),
+  ];
+  @override
+  void paint(Canvas canvas, Size size) {
+    for (final p in parts) {
+      final life = ((t - p.delay) / (1 - p.delay)).clamp(0.0, 1.0);
+      if (life <= 0 || life >= 1) continue;
+      final y = life * (size.height + 40) - 20;
+      final x = p.x * size.width + math.sin(life * 6 + p.x * 10) * 18;
+      canvas.save();
+      canvas.translate(x, y * (0.6 + p.speed * 0.6));
+      canvas.rotate(life * 8 + p.x * 6);
+      canvas.drawRect(
+          Rect.fromCenter(center: Offset.zero, width: 9, height: 5),
+          Paint()..color = _cols[p.ci].withOpacity(1 - life * 0.7));
+      canvas.restore();
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _ConfPainter old) => true;
+}
+
+class _EasterEggDialog extends StatefulWidget {
+  const _EasterEggDialog();
+  @override
+  State<_EasterEggDialog> createState() => _EasterEggDialogState();
+}
+
+class _EasterEggDialogState extends State<_EasterEggDialog>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _c = AnimationController(
+      vsync: this, duration: const Duration(milliseconds: 2600));
+  late final List<_Conf> _parts = [
+    for (var i = 0; i < 90; i++)
+      _Conf(math.Random(i).nextDouble(),
+          math.Random(i + 90).nextDouble() * 0.3,
+          math.Random(i + 180).nextDouble(), i % 5)
+  ];
+
+  @override
+  void initState() {
+    super.initState();
+    _c.forward();
+    Future.delayed(const Duration(milliseconds: 2700), () {
+      if (mounted) Navigator.pop(context);
+    });
+  }
+
+  @override
+  void dispose() {
+    _c.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => Dialog(
+        backgroundColor: Colors.transparent,
+        child: IgnorePointer(
+          child: Stack(children: [
+            Positioned.fill(
+              child: AnimatedBuilder(
+                animation: _c,
+                builder: (ctx, _) =>
+                    CustomPaint(painter: _ConfPainter(_c.value, _parts)),
+              ),
+            ),
+            Center(
+              child: AnimatedOpacity(
+                opacity: _c.value < 0.85 ? 1 : (1 - _c.value) / 0.15,
+                duration: const Duration(milliseconds: 120),
+                child: Container(
+                  padding: EdgeInsets.symmetric(
+                      horizontal: sc(28), vertical: sc(20)),
+                  decoration: BoxDecoration(
+                    color: Colors.black.withOpacity(0.78),
+                    borderRadius: BorderRadius.circular(sc(22)),
+                    border: Border.all(
+                        color: const Color(0xFFB3E65C).withOpacity(0.6),
+                        width: 1.5),
+                    boxShadow: [
+                      BoxShadow(
+                          color: const Color(0xFFB3E65C).withOpacity(0.25),
+                          blurRadius: 30),
+                    ],
+                  ),
+                  child: Column(mainAxisSize: MainAxisSize.min, children: [
+                    Text('🦆', style: TextStyle(fontSize: sc(40))),
+                    SizedBox(height: sc(8)),
+                    Text(
+                        tr('Кря! Ты нашёл пасхалку!',
+                            'Quack! You found the easter egg!'),
+                        style: TextStyle(
+                            fontSize: sc(15),
+                            fontWeight: FontWeight.w900,
+                            color: const Color(0xFFB3E65C))),
+                  ]),
+                ),
+              ),
+            ),
+          ]),
+        ),
+      );
 }

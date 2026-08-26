@@ -17,6 +17,8 @@ class UiSettings {
   static final ValueNotifier<Color?> accentColor = ValueNotifier(null);
   static final ValueNotifier<Color?> buttonColor = ValueNotifier(null);
   static final ValueNotifier<bool> autoTheme = ValueNotifier(false);
+  static final ValueNotifier<int> themeFrom = ValueNotifier(19 * 60); // 🌙 с (минуты)
+  static final ValueNotifier<int> themeTo = ValueNotifier(7 * 60); // 🌙 до (минуты)
   static final ValueNotifier<bool> alwaysOnTop = ValueNotifier(false);
   static final ValueNotifier<double> windowOpacity = ValueNotifier(1.0);
   static final ValueNotifier<int> fontMode = ValueNotifier(0);
@@ -40,6 +42,8 @@ class UiSettings {
   static final ValueNotifier<Color?> bgColor = ValueNotifier(null);
   static final ValueNotifier<double> auroraSpeed = ValueNotifier(1.0);
   static final ValueNotifier<int> bgStyle = ValueNotifier(0);
+  static final ValueNotifier<double> bgDensity = ValueNotifier(1.0);
+  static final ValueNotifier<bool> compactSidebar = ValueNotifier(false);
   static final ValueNotifier<double> vignette = ValueNotifier(0.35);
 
   // ── графика ──
@@ -69,8 +73,9 @@ class UiSettings {
 
   static final Listenable general = Listenable.merge([
     isDark, language, uiScale, animationsEnabled, closeToTray, sidebarRight,
-    accentColor, buttonColor, autoTheme, alwaysOnTop, windowOpacity, fontMode,
-    animSpeed, gradientAccent, accent2, noise, parallax,
+    accentColor, buttonColor, autoTheme, themeFrom, themeTo,
+    alwaysOnTop, windowOpacity, fontMode,
+    animSpeed, gradientAccent, accent2, noise, parallax, compactSidebar,
     bootEnabled, bootDuration, bootCaption, vignette, selectedConfig,
     cardShadows, ecoMode,
   ]);
@@ -79,7 +84,7 @@ class UiSettings {
     specular, glassRadius, glassTint, realBlur,
   ]);
   static final Listenable aurora = Listenable.merge([
-    liveBg, bgColor, auroraSpeed, bgStyle, fpsCap, ecoMode,
+    liveBg, bgColor, auroraSpeed, bgStyle, bgDensity, fpsCap, ecoMode,
   ]);
   static final Listenable sound = Listenable.merge([soundEnabled, soundVolume]);
   static final Listenable all = Listenable.merge([general, glass, aurora, sound]);
@@ -99,6 +104,8 @@ class UiSettings {
     'sideR': sidebarRight.value,
     'accent': accentColor.value?.value,
     'autoTh': autoTheme.value,
+    'thFrom': themeFrom.value,
+    'thTo': themeTo.value,
     'aot': alwaysOnTop.value,
     'wOp': windowOpacity.value,
     'font': fontMode.value,
@@ -114,6 +121,8 @@ class UiSettings {
     'bg': bgColor.value?.value,
     'auroraSp': auroraSpeed.value,
     'bgStyle': bgStyle.value,
+    'bgDens': bgDensity.value,
+    'cSide': compactSidebar.value,
     'vig': vignette.value,
     'fps': fpsCap.value,
     'eco': ecoMode.value,
@@ -159,6 +168,8 @@ class UiSettings {
         sidebarRight.value = b('sideR', false);
         accentColor.value = c('accent');
         autoTheme.value = b('autoTh', false);
+      themeFrom.value = (j['thFrom'] ?? 19 * 60) as int;
+      themeTo.value = (j['thTo'] ?? 7 * 60) as int;
         alwaysOnTop.value = b('aot', false);
         windowOpacity.value = d('wOp', 1.0);
         fontMode.value = (j['font'] ?? 0) as int;
@@ -176,8 +187,10 @@ class UiSettings {
         liveBg.value = b('liveBg', true);
         bgColor.value = c('bg');
         auroraSpeed.value = d('auroraSp', 1.0);
-        bgStyle.value = (j['bgStyle'] ?? 0) as int;
-        vignette.value = d('vig', 0.35);
+      bgStyle.value = (j['bgStyle'] ?? 0) as int;
+      bgDensity.value = d('bgDens', 1.0);
+      compactSidebar.value = b('cSide', false);
+      vignette.value = d('vig', 0.35);
 
         fpsCap.value = (j['fps'] ?? 24) as int;
         ecoMode.value = b('eco', false);
@@ -246,6 +259,8 @@ class UiSettings {
     sidebarRight.value = false;
     accentColor.value = null;
     autoTheme.value = false;
+    themeFrom.value = 19 * 60;
+    themeTo.value = 7 * 60;
     alwaysOnTop.value = false;
     windowOpacity.value = 1.0;
     fontMode.value = 0;
@@ -264,6 +279,8 @@ class UiSettings {
     bgColor.value = null;
     auroraSpeed.value = 1.0;
     bgStyle.value = 0;
+    bgDensity.value = 1.0;
+    compactSidebar.value = false;
     vignette.value = 0.35;
     fpsCap.value = 24;
     ecoMode.value = false;
