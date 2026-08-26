@@ -80,7 +80,11 @@ class _LiveBackgroundState extends State<LiveBackground> {
                       ? _YWavePainter(_t, widget.color)
                       : widget.style == 4
                           ? _CloudsPainter(_t, widget.color)
-                          : _AuroraPainter(_t, widget.color),
+                          : widget.style == 5
+                              ? _DucksPainter(_t, widget.color)
+                              : widget.style == 6
+                                  ? _FrogsPainter(_t, widget.color)
+                                  : _AuroraPainter(_t, widget.color),
         ),
       );
 }
@@ -125,6 +129,120 @@ class _AuroraPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant _AuroraPainter old) => old.t != t;
+}
+
+// ── 🦆🐸 общие параметры дрейфа ───────────
+class _Drift {
+  final double y, s, p, o;
+  const _Drift(this.y, this.s, this.p, this.o);
+}
+
+// ── 🦆 Утки: силуэты плывут ВЛЕВО с покачиванием ───────────
+class _DucksPainter extends CustomPainter {
+  final double t;
+  final Color base;
+  _DucksPainter(this.t, this.base);
+  static const double _tau = 2 * math.pi;
+  static const List<_Drift> _items = [
+    _Drift(0.16, 1.10, 0.10, 0.10),
+    _Drift(0.38, 0.75, 0.45, 0.07),
+    _Drift(0.58, 1.35, 0.70, 0.11),
+    _Drift(0.78, 0.90, 0.30, 0.08),
+  ];
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final w = size.width, h = size.height;
+    if (w <= 0 || h <= 0) return;
+    final tint = Color.lerp(Colors.white, base, 0.2)!;
+    for (final c in _items) {
+      final s = w * 0.10 * c.s;
+      final cw = s * 1.2;
+      final travel = w + cw * 2;
+      double x = (c.p - t) % 1.0;
+      if (x < 0) x += 1.0;
+      final cx = x * travel - cw;
+      final bob = math.sin(_tau * (t * 3 + c.p)) * h * 0.008;
+      canvas.drawPath(
+        _duck(cx, h * c.y + bob, s),
+        Paint()
+          ..color = tint.withOpacity(c.o)
+          ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 1.2),
+      );
+    }
+  }
+
+  /// утка: тело + хвост + шея + голова + клюв (один Path → ровная заливка)
+  Path _duck(double x, double y, double s) {
+    return Path()
+      ..addOval(Rect.fromLTWH(x, y, s, s * 0.42))
+      ..moveTo(x + s * 0.92, y + s * 0.12)
+      ..lineTo(x + s * 1.14, y - s * 0.10)
+      ..lineTo(x + s * 0.82, y + s * 0.04)
+      ..close()
+      ..addRect(Rect.fromLTWH(x + s * 0.10, y - s * 0.24, s * 0.16, s * 0.34))
+      ..addOval(Rect.fromCircle(
+          center: Offset(x + s * 0.18, y - s * 0.26), radius: s * 0.15))
+      ..moveTo(x + s * 0.05, y - s * 0.30)
+      ..lineTo(x - s * 0.12, y - s * 0.24)
+      ..lineTo(x + s * 0.05, y - s * 0.18)
+      ..close();
+  }
+
+  @override
+  bool shouldRepaint(covariant _DucksPainter old) => old.t != t;
+}
+
+// ── 🐸 Лягушки: силуэты скачут ВЛЕВО ───────────
+class _FrogsPainter extends CustomPainter {
+  final double t;
+  final Color base;
+  _FrogsPainter(this.t, this.base);
+  static const List<_Drift> _items = [
+    _Drift(0.18, 0.90, 0.15, 0.09),
+    _Drift(0.42, 1.20, 0.55, 0.11),
+    _Drift(0.66, 0.70, 0.80, 0.07),
+    _Drift(0.86, 1.00, 0.35, 0.09),
+  ];
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final w = size.width, h = size.height;
+    if (w <= 0 || h <= 0) return;
+    final tint = Color.lerp(Colors.white, base, 0.2)!;
+    for (final c in _items) {
+      final s = w * 0.09 * c.s;
+      final cw = s * 1.1;
+      final travel = w + cw * 2;
+      double x = (c.p - t) % 1.0;
+      if (x < 0) x += 1.0;
+      final cx = x * travel - cw;
+      // 🐾 прыжок: горб sin = подскок
+      final hop =
+          -math.sin(math.pi * ((t * 4 + c.p) % 1.0)).abs() * h * 0.02;
+      canvas.drawPath(
+        _frog(cx, h * c.y + hop, s),
+        Paint()
+          ..color = tint.withOpacity(c.o)
+          ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 1.2),
+      );
+    }
+  }
+
+  /// лягушка: тело + два глаза + лапки
+  Path _frog(double x, double y, double s) {
+    return Path()
+      ..addOval(Rect.fromLTWH(x, y, s, s * 0.55))
+      ..addOval(Rect.fromCircle(
+          center: Offset(x + s * 0.28, y + s * 0.02), radius: s * 0.16))
+      ..addOval(Rect.fromCircle(
+          center: Offset(x + s * 0.72, y + s * 0.02), radius: s * 0.16))
+      ..addOval(Rect.fromLTWH(x + s * 0.06, y + s * 0.42, s * 0.20, s * 0.18))
+      ..addOval(Rect.fromLTWH(x + s * 0.74, y + s * 0.42, s * 0.20, s * 0.18));
+  }
+
+  @override
+  bool shouldRepaint(covariant _FrogsPainter old) => old.t != t;
 }
 
 // ── 🌊 Волны: три синусоиды, целые частоты = цикл без шва ──

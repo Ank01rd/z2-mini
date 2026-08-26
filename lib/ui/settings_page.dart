@@ -24,7 +24,7 @@ class SettingsPage extends StatefulWidget {
 
 class _SettingsPageState extends State<SettingsPage>
     with SingleTickerProviderStateMixin {
-  static int _cat = 0; // 🧯 static: не сбрасывается при пересоздании страницы
+  static int _cat = 0;
   static int _shown = 0;
   double _offsetY = 0;
   double _contentOp = 1;
@@ -513,21 +513,19 @@ class _SettingsPageState extends State<SettingsPage>
               _sep(),
               ValueListenableBuilder<int>(
                 valueListenable: UiSettings.bgStyle,
-                builder: (ctx, st, _) => Row(children: [
-                  _bgChip(0, Icons.cloud_rounded,
-                      tr('Аврора', 'Aurora'), st),
-                  SizedBox(width: sc(6)),
-                  _bgChip(1, Icons.waves_rounded, tr('Волны', 'Waves'), st),
-                  SizedBox(width: sc(6)),
-                  _bgChip(2, Icons.nightlight_rounded,
-                      tr('Звёзды', 'Stars'), st),
-                  SizedBox(width: sc(6)),
-                  _bgChip(3, Icons.flashlight_on_rounded,
-                      tr('Моя волна', 'My Wave'), st),
-                  SizedBox(width: sc(6)),
-                  _bgChip(4, Icons.filter_drama_rounded,
-                      tr('Облака', 'Clouds'), st),
-                ]),
+                builder: (ctx, st, _) => Wrap(
+                  spacing: sc(6),
+                  runSpacing: sc(6),
+                  children: [
+                    _bgChip(0, Icons.cloud_rounded, tr('Аврора', 'Aurora'), st),
+                    _bgChip(1, Icons.waves_rounded, tr('Волны', 'Waves'), st),
+                    _bgChip(2, Icons.nightlight_rounded, tr('Звёзды', 'Stars'), st),
+                    _bgChip(3, Icons.flashlight_on_rounded, tr('Моя волна', 'My Wave'), st),
+                    _bgChip(4, Icons.filter_drama_rounded, tr('Облака', 'Clouds'), st),
+                    _bgChip(5, Icons.sailing_rounded, tr('Утки', 'Ducks'), st),
+                    _bgChip(6, Icons.pets_rounded, tr('Лягушки', 'Frogs'), st),
+                  ],
+                ),
               ),
             ]),
         _gap(),
@@ -1294,48 +1292,43 @@ class _SettingsPageState extends State<SettingsPage>
 
   Widget _bgChip(int id, IconData ic, String label, int current) {
     final active = current == id;
-    return Expanded(
-      child: GestureDetector(
-        behavior: HitTestBehavior.opaque,
-        onTap: () {
-          SoundService.toggle();
-          UiSettings.bgStyle.value = id;
-          UiSettings.save();
-        },
-        child: AnimatedContainer(
-          duration: t.animDur,
-          curve: t.animCurve,
-          padding: EdgeInsets.symmetric(horizontal: sc(8), vertical: sc(9)),
-          decoration: BoxDecoration(
-            color: active ? t.accent.withOpacity(0.8) : t.card.withOpacity(0.5),
-            borderRadius: BorderRadius.circular(999),
-            border: Border.all(
-              color: active
-                  ? t.accent
-                  : Colors.white.withOpacity(t.isDark ? 0.10 : 0.5),
-            ),
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: () {
+        SoundService.toggle();
+        UiSettings.bgStyle.value = id;
+        UiSettings.save();
+      },
+      child: AnimatedContainer(
+        duration: t.animDur,
+        curve: t.animCurve,
+        padding: EdgeInsets.symmetric(horizontal: sc(10), vertical: sc(9)),
+        decoration: BoxDecoration(
+          color: active ? t.accent.withOpacity(0.8) : t.card.withOpacity(0.5),
+          borderRadius: BorderRadius.circular(999),
+          border: Border.all(
+            color: active
+                ? t.accent
+                : Colors.white.withOpacity(t.isDark ? 0.10 : 0.5),
           ),
-          child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
-            Icon(ic,
-                size: sc(13),
-                color: active ? t.buttonTextColor : t.text.withOpacity(0.6)),
-            SizedBox(width: sc(4)),
-            Flexible(
-              child: Text(label,
-                  style: TextStyle(
-                      fontSize: sc(10),
-                      fontWeight: FontWeight.w700,
-                      color: active
-                          ? t.buttonTextColor
-                          : t.text.withOpacity(0.6)),
-                  overflow: TextOverflow.ellipsis),
-            ),
-          ]),
         ),
+        child: Row(mainAxisSize: MainAxisSize.min, children: [
+          Icon(ic,
+              size: sc(13),
+              color: active ? t.buttonTextColor : t.text.withOpacity(0.6)),
+          SizedBox(width: sc(4)),
+          Text(label,
+              style: TextStyle(
+                  fontSize: sc(10),
+                  fontWeight: FontWeight.w700,
+                  color: active
+                      ? t.buttonTextColor
+                      : t.text.withOpacity(0.6))),
+        ]),
       ),
     );
   }
-}  // ← закрытие _SettingsPageState
+}
 
 // 💊 компактная таблетка значения: тап → ввод числа, клампит в min/max
 class _ValuePill extends StatefulWidget {

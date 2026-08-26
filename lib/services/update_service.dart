@@ -23,7 +23,7 @@ class UpdateService {
   static const String repo = 'Ank01rd/z2-mini';
 
   /// текущая версия билда — МЕНЯЙ при каждом релизе!
-static const String currentVersion = '1.1.1';
+static const String currentVersion = '1.1.2';
 
   static bool _busy = false;
 
