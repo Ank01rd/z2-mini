@@ -19,14 +19,16 @@ import 'package:window_manager/window_manager.dart';
 
 class SettingsPage extends StatefulWidget {
   final AppTheme theme;
-  const SettingsPage({super.key, required this.theme});
+  final ValueNotifier<int>? externalCat;
+  const SettingsPage({super.key, required this.theme, this.externalCat});
   @override
   State<SettingsPage> createState() => _SettingsPageState();
 }
 
 class _SettingsPageState extends State<SettingsPage>
     with SingleTickerProviderStateMixin {
-  static int _cat = 0; // 🧯 static: не сбрасывается при пересоздании страницы
+  int get _cat => widget.externalCat?.value ?? _localCat;
+  int _localCat = 0;
   static int _shown = 0;
   int _logoTaps = 0;
   Timer? _logoTimer;
@@ -56,6 +58,7 @@ class _SettingsPageState extends State<SettingsPage>
   @override
   void initState() {
     super.initState();
+    widget.externalCat?.addListener(_onExternalCat);
     if (UiSettings.animationsEnabled.value) {
       _enter.forward();
     } else {
@@ -63,8 +66,15 @@ class _SettingsPageState extends State<SettingsPage>
     }
   }
 
+  void _onExternalCat() {
+    final i = widget.externalCat!.value;
+    if (i == _shown) return;
+    _animateTo(i);
+  }
+
   @override
   void dispose() {
+    widget.externalCat?.removeListener(_onExternalCat);
     _enterCurve.dispose();
     _enter.dispose();
     super.dispose();
@@ -72,8 +82,16 @@ class _SettingsPageState extends State<SettingsPage>
 
   void _goCat(int i) {
     if (i == _cat) return;
-    final dir = i > _cat ? 1 : -1;
-    setState(() => _cat = i);
+    if (widget.externalCat != null) {
+      widget.externalCat!.value = i; // listener сам запустит _animateTo
+    } else {
+      _localCat = i;
+      _animateTo(i);
+    }
+  }
+
+  void _animateTo(int i) {
+    final dir = i > _shown ? 1 : -1;
     if (!UiSettings.animationsEnabled.value) {
       setState(() => _shown = i);
       return;
@@ -91,7 +109,7 @@ class _SettingsPageState extends State<SettingsPage>
         _slideDur = Duration.zero;
         _offsetY = 0.3 * dir;
         _contentOp = 0;
-        _shown = _cat;
+        _shown = i;
       });
       Future.delayed(const Duration(milliseconds: 30), () {
         if (!mounted || tk != _token) return;
@@ -104,51 +122,78 @@ class _SettingsPageState extends State<SettingsPage>
       });
     });
   }
-
   @override
   Widget build(BuildContext context) {
     return AnimatedBuilder(
-      animation: UiSettings.all,
+      animation: Listenable.merge([
+        UiSettings.all,
+        if (widget.externalCat != null) widget.externalCat!,
+      ]),
       builder: (ctx, _) {
-        return Row(children: [
-          SlideTransition(
-            position:
-                Tween<Offset>(begin: const Offset(-0.25, 0), end: Offset.zero)
-                    .animate(_enterCurve),
-            child: FadeTransition(opacity: _enterCurve, child: _rail()),
-          ),
-          VerticalDivider(
-              width: 1, color: Colors.white.withOpacity(t.isDark ? 0.08 : 0.3)),
-          Expanded(
-            child: SlideTransition(
+        return ValueListenableBuilder<int>(
+          valueListenable: UiSettings.sidebarPos,
+          builder: (ctx, pos, _) {
+            final hz = pos == 2 || pos == 3;
+            if (hz) {
+              return _contentPane();
+            }
+            final rail = SlideTransition(
               position: Tween<Offset>(
-                      begin: const Offset(0.08, 0), end: Offset.zero)
+                      begin:
+                          hz ? const Offset(0, -0.25) : const Offset(-0.25, 0),
+                      end: Offset.zero)
                   .animate(_enterCurve),
-              child: FadeTransition(
-                opacity: _enterCurve,
-                child: Padding(
-                  padding: EdgeInsets.fromLTRB(sc(16), sc(44), sc(64), sc(16)),
-                  child: Center(
-                    child: ClipRect(
-                      child: AnimatedSlide(
-                        offset: Offset(0, _offsetY),
-                        duration: _slideDur,
-                        curve: _slideCurve,
-                        child: AnimatedOpacity(
-                          opacity: _contentOp,
-                          duration: _slideDur,
-                          curve: _slideCurve,
-                          child: LiquidGlassContainer(
-                            theme: t,
-                            radius: 24,
-                            child: SingleChildScrollView(
-                              padding: EdgeInsets.all(sc(14)),
-                              child: KeyedSubtree(
-                                key: ValueKey(_shown),
-                                child: _page(_shown),
-                              ),
-                            ),
-                          ),
+              child: FadeTransition(opacity: _enterCurve, child: _rail(hz)),
+            );
+            final content = Expanded(child: _contentPane());
+            final divV = VerticalDivider(
+                width: 1,
+                color: Colors.white.withOpacity(t.isDark ? 0.08 : 0.3));
+            final divH = Divider(
+                height: 1,
+                color: Colors.white.withOpacity(t.isDark ? 0.08 : 0.3));
+            switch (pos) {
+              case 1:
+                return Row(children: [content, divV, rail]);
+              case 2:
+                return Column(children: [rail, divH, content]);
+              case 3:
+                return Column(children: [content, divH, rail]);
+              default:
+                return Row(children: [rail, divV, content]);
+            }
+          },
+        );
+      },
+    );
+  }
+
+  Widget _contentPane() => SlideTransition(
+        position:
+            Tween<Offset>(begin: const Offset(0.08, 0), end: Offset.zero)
+                .animate(_enterCurve),
+        child: FadeTransition(
+          opacity: _enterCurve,
+          child: Padding(
+            padding: EdgeInsets.fromLTRB(sc(16), sc(44), sc(64), sc(16)),
+            child: Center(
+              child: ClipRect(
+                child: AnimatedSlide(
+                  offset: Offset(0, _offsetY),
+                  duration: _slideDur,
+                  curve: _slideCurve,
+                  child: AnimatedOpacity(
+                    opacity: _contentOp,
+                    duration: _slideDur,
+                    curve: _slideCurve,
+                    child: LiquidGlassContainer(
+                      theme: t,
+                      radius: 24,
+                      child: SingleChildScrollView(
+                        padding: EdgeInsets.all(sc(14)),
+                        child: KeyedSubtree(
+                          key: ValueKey(_shown),
+                          child: _page(_shown),
                         ),
                       ),
                     ),
@@ -157,50 +202,68 @@ class _SettingsPageState extends State<SettingsPage>
               ),
             ),
           ),
-        ]);
-      },
-    );
-  }
+        ),
+      );
 
-  Widget _rail() => ValueListenableBuilder<bool>(
+  Widget _rail(bool hz) => ValueListenableBuilder<bool>(
         valueListenable: UiSettings.compactSidebar,
         builder: (ctx, compact, _) => ClipRect(
               child: UiSettings.realBlur.value
                   ? BackdropFilter(
                       filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
-                      child: _railBody(compact),
+                      child: _railBody(compact, hz),
                     )
-                  : _railBody(compact),
+                  : _railBody(compact, hz),
             ),
       );
 
-  Widget _railBody(bool compact) => AnimatedContainer(
+  Widget _railBody(bool compact, bool hz) => AnimatedContainer(
         duration: const Duration(milliseconds: 260),
         curve: Curves.easeOutCubic,
-        width: compact ? sc(60) : sc(190),
+        width: hz ? double.infinity : (compact ? sc(60) : sc(190)),
+        height: hz ? (compact ? sc(56) : sc(68)) : double.infinity,
         color: (t.isDark ? const Color(0xFF0B0E14) : Colors.white)
             .withOpacity(t.isDark ? 0.35 : 0.5),
         child: LayoutBuilder(
-          builder: (ctx, c) => SingleChildScrollView(
-            child: ConstrainedBox(
-              constraints: BoxConstraints(minHeight: c.maxHeight),
-              child: IntrinsicHeight(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    for (var i = 0; i < _cats.length; i++) ...[
-                      if (i > 0) SizedBox(height: sc(6)),
-                      Padding(
-                        padding: EdgeInsets.symmetric(
-                            horizontal: compact ? sc(8) : sc(10)),
-                        child: _catBtn(i, compact),
+          builder: (ctx, c) => hz
+              ? SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: ConstrainedBox(
+                    constraints: BoxConstraints(minWidth: c.maxWidth),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        for (var i = 0; i < _cats.length; i++) ...[
+                          if (i > 0) SizedBox(width: sc(6)),
+                          Padding(
+                            padding: EdgeInsets.symmetric(vertical: sc(8)),
+                            child: _catBtn(i, true),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                )
+              : SingleChildScrollView(
+                  child: ConstrainedBox(
+                    constraints: BoxConstraints(minHeight: c.maxHeight),
+                    child: IntrinsicHeight(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          for (var i = 0; i < _cats.length; i++) ...[
+                            if (i > 0) SizedBox(height: sc(6)),
+                            Padding(
+                              padding: EdgeInsets.symmetric(
+                                  horizontal: compact ? sc(8) : sc(10)),
+                              child: _catBtn(i, compact),
+                            ),
+                          ],
+                        ],
                       ),
-                    ],
-                  ],
+                    ),
+                  ),
                 ),
-              ),
-            ),
-          ),
         ),
       );
 
@@ -276,7 +339,6 @@ class _SettingsPageState extends State<SettingsPage>
         : btn;
   }
 
-  // ── вкладки ────────────────────────────────────────────────
   Widget _appearance() => _col([
         _card(title: tr('Тема', 'Theme'), icon: Icons.palette_rounded, children: [
           _themeSwitch(),
@@ -388,11 +450,21 @@ class _SettingsPageState extends State<SettingsPage>
               UiSettings.save();
             }),
             _sep(),
-            _switch(tr('Сайдбар справа', 'Sidebar right'),
-                UiSettings.sidebarRight.value, () {
-              UiSettings.sidebarRight.value = !UiSettings.sidebarRight.value;
-              UiSettings.save();
-            }, icon: Icons.flip_to_front_rounded),
+            Row(children: [
+              Icon(Icons.flip_to_front_rounded, size: 18, color: t.accent),
+              SizedBox(width: 10),
+              Expanded(
+                child: Text(tr('Сайдбар', 'Sidebar'),
+                    style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        color: t.text)),
+              ),
+              for (var i = 0; i < 4; i++) ...[
+                if (i > 0) SizedBox(width: sc(4)),
+                _posChip(i),
+              ],
+            ]),
             _sep(),
             _switch(tr('Компактный сайдбар', 'Compact sidebar'),
                 UiSettings.compactSidebar.value, () {
@@ -586,21 +658,7 @@ class _SettingsPageState extends State<SettingsPage>
                 UiSettings.save();
               }),
               _sep(),
-              ValueListenableBuilder<int>(
-                valueListenable: UiSettings.bgStyle,
-                builder: (ctx, st, _) => GridView.builder(
-                  shrinkWrap: true,
-                  physics: const NeverScrollableScrollPhysics(),
-                  gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                    crossAxisCount: 4,
-                    mainAxisSpacing: sc(6),
-                    crossAxisSpacing: sc(6),
-                    childAspectRatio: 2.2,
-                  ),
-                  itemCount: _bgStyles.length,
-                  itemBuilder: (c, i) => _bgCell(i, st),
-                ),
-              ),
+              _bgCurrentChip(),
             ]),
         _gap(),
         _card(
@@ -621,9 +679,8 @@ class _SettingsPageState extends State<SettingsPage>
               },
                   suffix: 'x${UiSettings.bgDensity.value.toStringAsFixed(1)}'),
               _sep(),
-              _slider(
-                  tr('Виньетка', 'Vignette'), UiSettings.vignette.value, 0.0, 0.8,
-                  (v) {
+              _slider(tr('Виньетка', 'Vignette'), UiSettings.vignette.value,
+                  0.0, 0.8, (v) {
                 UiSettings.vignette.value = v;
                 UiSettings.save();
               }, suffix: UiSettings.vignette.value.toStringAsFixed(2)),
@@ -645,66 +702,79 @@ class _SettingsPageState extends State<SettingsPage>
             ]),
       ]);
 
-  Widget _graphics() => _col([
-        _card(
-            title: tr('Кадровая частота', 'Frame rate'),
-            icon: Icons.monitor_rounded,
-            children: [
-              Row(children: [
-                for (final f in [12, 24, 30, 60]) ...[
-                  Expanded(child: _fpsChip(f)),
-                  if (f != 60) SizedBox(width: sc(6)),
-                ],
-              ]),
-              _sep(),
-              _switch(
-                  tr('Экономия энергии', 'Power saving'),
-                  UiSettings.ecoMode.value, () {
-                final on = !UiSettings.ecoMode.value;
-                UiSettings.ecoMode.value = on;
-                if (on) UiSettings.parallax.value = false;
+  Widget _bgCurrentChip() => ValueListenableBuilder<int>(
+        valueListenable: UiSettings.bgStyle,
+        builder: (ctx, cur, _) {
+          final e = _bgStyles[cur];
+          return Listener(
+            onPointerSignal: (ev) {
+              if (ev is PointerScrollEvent) {
+                final dir = ev.scrollDelta.dy > 0 ? 1 : -1;
+                final next =
+                    (cur + dir + _bgStyles.length) % _bgStyles.length;
+                UiSettings.bgStyle.value = next;
                 UiSettings.save();
-              }, icon: Icons.battery_saver_rounded),
-              _sep(),
-              _switch(
-                  tr('Тени карточек и кнопок', 'Card & button shadows'),
-                  UiSettings.cardShadows.value, () {
-                UiSettings.cardShadows.value = !UiSettings.cardShadows.value;
-                UiSettings.save();
-              }, icon: Icons.layers_rounded),
-            ]),
-      ]);
+                SoundService.toggle();
+              }
+            },
+            child: GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onTap: () => _openBgDialog(),
+              child: AnimatedContainer(
+                duration: t.animDur,
+                curve: t.animCurve,
+                padding: EdgeInsets.symmetric(
+                    horizontal: sc(14), vertical: sc(12)),
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(colors: [
+                    t.accent.withOpacity(0.20),
+                    t.accent.withOpacity(0.08),
+                  ]),
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(color: t.accent.withOpacity(0.5)),
+                ),
+                child: Row(children: [
+                  Container(
+                    width: sc(36),
+                    height: sc(36),
+                    decoration: BoxDecoration(
+                      color: Colors.black.withOpacity(t.isDark ? 0.4 : 0.1),
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: t.accent.withOpacity(0.4)),
+                    ),
+                    child: Icon(e[0] as IconData,
+                        size: sc(18), color: t.accent),
+                  ),
+                  SizedBox(width: sc(12)),
+                  Expanded(
+                    child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(tr(e[1] as String, e[2] as String),
+                              style: TextStyle(
+                                  fontSize: sc(13),
+                                  fontWeight: FontWeight.w800,
+                                  color: t.text)),
+                          Text(tr('Крути колёсиком или нажми для списка',
+                                  'Scroll or tap for gallery'),
+                              style: TextStyle(
+                                  fontSize: sc(10),
+                                  color: t.text.withOpacity(0.6))),
+                        ]),
+                  ),
+                  Icon(Icons.unfold_more_rounded,
+                      size: sc(18), color: t.accent),
+                ]),
+              ),
+            ),
+          );
+        },
+      );
 
-  Widget _fpsChip(int f) {
-    final active = UiSettings.fpsCap.value == f;
-    return GestureDetector(
-      behavior: HitTestBehavior.opaque,
-      onTap: () {
-        SoundService.toggle();
-        UiSettings.fpsCap.value = f;
-        UiSettings.save();
-      },
-      child: AnimatedContainer(
-        duration: t.animDur,
-        curve: t.animCurve,
-        padding: EdgeInsets.symmetric(vertical: sc(9)),
-        decoration: BoxDecoration(
-          color: active ? t.accent.withOpacity(0.8) : t.card.withOpacity(0.5),
-          borderRadius: BorderRadius.circular(999),
-          border: Border.all(
-              color: active
-                  ? t.accent
-                  : Colors.white.withOpacity(t.isDark ? 0.10 : 0.5)),
-        ),
-        child: Center(
-          child: Text('$f FPS',
-              style: TextStyle(
-                  fontSize: sc(11),
-                  fontWeight: FontWeight.w800,
-                  color:
-                      active ? t.buttonTextColor : t.text.withOpacity(0.6))),
-        ),
-      ),
+  void _openBgDialog() {
+    showDialog(
+      context: context,
+      builder: (ctx) => _BgGalleryDialog(theme: t),
     );
   }
 
@@ -832,6 +902,35 @@ class _SettingsPageState extends State<SettingsPage>
       ),
     );
   }
+
+  Widget _graphics() => _col([
+        _card(
+            title: tr('Производительность', 'Performance'),
+            icon: Icons.monitor_rounded,
+            children: [
+              Row(children: [
+                for (final v in [12, 24, 30, 60]) ...[
+                  if (v != 12) SizedBox(width: sc(6)),
+                  _chip('$v FPS', UiSettings.fpsCap.value == v, () {
+                    UiSettings.fpsCap.value = v;
+                    UiSettings.save();
+                  }),
+                ],
+              ]),
+              _sep(),
+              _switch(tr('Эко-режим', 'Eco mode'), UiSettings.ecoMode.value,
+                  () {
+                UiSettings.ecoMode.value = !UiSettings.ecoMode.value;
+                UiSettings.save();
+              }, icon: Icons.eco_rounded),
+              _sep(),
+              _switch(tr('Тени карточек', 'Card shadows'),
+                  UiSettings.cardShadows.value, () {
+                UiSettings.cardShadows.value = !UiSettings.cardShadows.value;
+                UiSettings.save();
+              }, icon: Icons.layers_rounded),
+            ]),
+      ]);
 
   Widget _about() => _col([
         Container(
@@ -1080,7 +1179,6 @@ class _SettingsPageState extends State<SettingsPage>
         icon: Icons.folder_rounded);
   }
 
-  // 🥚 пасхалка: 5 тапов по логотипу → конфетти + кря!
   void _logoTap() {
     _logoTaps++;
     _logoTimer?.cancel();
@@ -1114,7 +1212,6 @@ class _SettingsPageState extends State<SettingsPage>
         ),
       );
 
-  // ── хелперы ────────────────────────────────────────────────
   Widget _col(List<Widget> c) => Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisSize: MainAxisSize.min,
@@ -1236,6 +1333,41 @@ class _SettingsPageState extends State<SettingsPage>
           ),
         ]),
       );
+
+  Widget _posChip(int i) {
+    final active = UiSettings.sidebarPos.value == i;
+    const ics = [
+      Icons.chevron_left_rounded,
+      Icons.chevron_right_rounded,
+      Icons.keyboard_arrow_up_rounded,
+      Icons.keyboard_arrow_down_rounded,
+    ];
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: () {
+        SoundService.toggle();
+        UiSettings.sidebarPos.value = i;
+        UiSettings.save();
+      },
+      child: AnimatedContainer(
+        duration: t.animDur,
+        curve: t.animCurve,
+        width: sc(30),
+        height: sc(30),
+        decoration: BoxDecoration(
+          color: active ? t.accent.withOpacity(0.8) : t.card.withOpacity(0.5),
+          borderRadius: BorderRadius.circular(9),
+          border: Border.all(
+              color: active
+                  ? t.accent
+                  : Colors.white.withOpacity(t.isDark ? 0.10 : 0.5)),
+        ),
+        child: Icon(ics[i],
+            size: sc(16),
+            color: active ? t.buttonTextColor : t.text.withOpacity(0.6)),
+      ),
+    );
+  }
 
   Widget _chip(String label, bool active, VoidCallback onTap) =>
       GestureDetector(
@@ -1390,68 +1522,59 @@ class _SettingsPageState extends State<SettingsPage>
       );
 
   static const List<List<Object>> _bgStyles = [
-    [Icons.cloud_rounded, 'Аврора', 'Aurora'],
-    [Icons.waves_rounded, 'Волны', 'Waves'],
-    [Icons.nightlight_rounded, 'Звёзды', 'Stars'],
-    [Icons.flashlight_on_rounded, 'Моя волна', 'My Wave'],
-    [Icons.filter_drama_rounded, 'Облака', 'Clouds'],
-    [Icons.sailing_rounded, 'Утки', 'Ducks'],
-    [Icons.pets_rounded, 'Лягушки', 'Frogs'],
-    [Icons.grid_on_rounded, 'Точки', 'Dots'],
-    [Icons.opacity_rounded, 'Аквариум', 'Aquarium'],
+    [Icons.cloud_rounded, 'Аврора', 'Aurora', 0],
+    [Icons.waves_rounded, 'Волны', 'Waves', 0],
+    [Icons.nightlight_rounded, 'Звёзды', 'Stars', 0],
+    [Icons.flashlight_on_rounded, 'Моя волна', 'My Wave', 0],
+    [Icons.filter_drama_rounded, 'Облака', 'Clouds', 0],
+    [Icons.sailing_rounded, 'Утки', 'Ducks', 0],
+    [Icons.pets_rounded, 'Лягушки', 'Frogs', 0],
+    [Icons.grid_on_rounded, 'Точки', 'Dots', 0],
+    [Icons.opacity_rounded, 'Аквариум', 'Aquarium', 0],
+    [Icons.cloud_queue_rounded, 'Туманность', 'Nebula', 1],
+    [Icons.blur_circular_rounded, 'Чёрная дыра', 'BlackHole', 1],
+    [Icons.rocket_launch_rounded, 'Комета', 'Comet', 1],
+    [Icons.flash_on_rounded, 'Метеоры', 'Meteors', 1],
+    [Icons.public_rounded, 'Орбиты', 'Orbits', 1],
+    [Icons.brightness_2_rounded, 'Луна', 'Moon', 1],
+    [Icons.auto_awesome_rounded, 'Звёздная пыль', 'Star Dust', 1],
+    [Icons.wb_twilight_rounded, 'Светлячки', 'Fireflies', 2],
+    [Icons.eco_rounded, 'Листопад', 'Leaves', 2],
+    [Icons.local_florist_rounded, 'Сакура', 'Sakura', 2],
+    [Icons.ac_unit_rounded, 'Снег', 'Snow', 2],
+    [Icons.grain_rounded, 'Дождь', 'Rain', 2],
+    [Icons.water_drop_rounded, 'Капли', 'Drops', 2],
+    [Icons.air_rounded, 'Дым', 'Smoke', 2],
+    [Icons.wb_sunny_rounded, 'Пыль в луче', 'Dust', 2],
+    [Icons.blur_on_rounded, 'Лава-лампа', 'Lava', 2],
+    [Icons.code_rounded, 'Матрица', 'Matrix', 3],
+    [Icons.grid_4x4_rounded, 'Синтвейв', 'Synthwave', 3],
+    [Icons.tv_rounded, 'CRT', 'CRT', 3],
+    [Icons.terminal_rounded, 'Терминал', 'Terminal', 3],
+    [Icons.radar_rounded, 'Радар', 'Radar', 3],
+    [Icons.show_chart_rounded, 'Осциллограф', 'Scope', 3],
+    [Icons.videocam_rounded, 'VHS', 'VHS', 3],
+    [Icons.view_module_rounded, 'Пиксели', 'Pixels', 3],
+    [Icons.insights_rounded, 'Ленты', 'Ribbons', 4],
+    [Icons.change_circle_rounded, 'Калейдоскоп', 'Kaleido', 4],
+    [Icons.filter_vintage_rounded, 'Мандала', 'Mandala', 4],
+    [Icons.terrain_rounded, 'Изолинии', 'Topo', 4],
+    [Icons.hexagon_rounded, 'Соты', 'Hex', 4],
+    [Icons.circle_outlined, 'Пульсар', 'Pulsar', 4],
+    [Icons.diamond_rounded, 'Вороной', 'Voronoi', 4],
+    [Icons.bubble_chart_rounded, 'Пузыри', 'Bubbles', 4],
+    [Icons.location_city_rounded, 'Город', 'City', 5],
+    [Icons.lightbulb_rounded, 'Неон', 'Neon', 5],
+    [Icons.local_fire_department_rounded, 'Камин', 'Fireplace', 5],
+    [Icons.album_rounded, 'Винил', 'Vinyl', 5],
+    [Icons.celebration_rounded, 'Конфетти', 'Confetti', 5],
+    [Icons.flight_rounded, 'Самолётики', 'Planes', 5],
   ];
+}
 
-  // 🎯 ячейка сетки стилей фона — все одного размера, ничего не «едет»
-  Widget _bgCell(int id, int current) {
-    final e = _bgStyles[id];
-    final active = current == id;
-    return GestureDetector(
-      behavior: HitTestBehavior.opaque,
-      onTap: () {
-        SoundService.toggle();
-        UiSettings.bgStyle.value = id;
-        UiSettings.save();
-      },
-      child: AnimatedContainer(
-        duration: t.animDur,
-        curve: t.animCurve,
-        padding: EdgeInsets.symmetric(horizontal: sc(6), vertical: sc(8)),
-        decoration: BoxDecoration(
-          color: active ? t.accent.withOpacity(0.8) : t.card.withOpacity(0.5),
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(
-            color: active
-                ? t.accent
-                : Colors.white.withOpacity(t.isDark ? 0.10 : 0.5),
-          ),
-        ),
-        child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
-          Icon(e[0] as IconData,
-              size: sc(13),
-              color: active ? t.buttonTextColor : t.text.withOpacity(0.6)),
-          SizedBox(width: sc(4)),
-          Flexible(
-            child: Text(tr(e[1] as String, e[2] as String),
-                style: TextStyle(
-                    fontSize: sc(9),
-                    fontWeight: FontWeight.w700,
-                    color: active
-                        ? t.buttonTextColor
-                        : t.text.withOpacity(0.6)),
-                overflow: TextOverflow.ellipsis),
-          ),
-        ]),
-      ),
-    );
-  }
-} // ← закрытие _SettingsPageState
-
-// ============================================================
-// 🎛 Колёсико времени: 1 тик = 1 мин, с ускорением при долгой прокрутке
-// ============================================================
 class _TimeWheel extends StatefulWidget {
   final AppTheme theme;
-  final int value; // минуты 0..1439
+  final int value;
   final ValueChanged<int> on;
   const _TimeWheel({required this.theme, required this.value, required this.on});
   @override
@@ -1467,10 +1590,8 @@ class _TimeWheelState extends State<_TimeWheel> {
 
   void _wheel(double dy) {
     final now = DateTime.now().millisecondsSinceEpoch;
-    // 🔥 пока крутишь без пауз — «раскручивается» маховик
     _combo = (now - _last < 250) ? _combo + 1 : 0;
     _last = now;
-    // 🚀 усиление: 1 мин → 5 → 15 → 60
     final step = _combo < 6 ? 1 : _combo < 14 ? 5 : _combo < 26 ? 15 : 60;
     final dir = dy < 0 ? 1 : -1;
     widget.on((widget.value + dir * step + 1440) % 1440);
@@ -1510,7 +1631,6 @@ class _TimeWheelState extends State<_TimeWheel> {
   }
 }
 
-// 💊 компактная таблетка значения: тап → ввод числа, клампит в min/max
 class _ValuePill extends StatefulWidget {
   final String text;
   final double factor, min, max;
@@ -1599,9 +1719,6 @@ class _ValuePillState extends State<_ValuePill> {
       );
 }
 
-// ============================================================
-// 🎨 Колорпикер
-// ============================================================
 class _ColorPickerDialog extends StatefulWidget {
   final AppTheme theme;
   final String title;
@@ -2131,9 +2248,6 @@ class _CheckerPainter extends CustomPainter {
   bool shouldRepaint(covariant CustomPainter old) => false;
 }
 
-// ============================================================
-// 🥚 Пасхалка: конфетти + утка
-// ============================================================
 class _Conf {
   final double x, delay, speed;
   final int ci;
@@ -2252,4 +2366,216 @@ class _EasterEggDialogState extends State<_EasterEggDialog>
           ]),
         ),
       );
+}
+
+class _BgGalleryDialog extends StatefulWidget {
+  final AppTheme theme;
+  const _BgGalleryDialog({required this.theme});
+  @override
+  State<_BgGalleryDialog> createState() => _BgGalleryDialogState();
+}
+
+class _BgGalleryDialogState extends State<_BgGalleryDialog> {
+  int _filter = 0;
+  static const _cats = [
+    ['Все', 'All', Icons.apps_rounded],
+    ['База', 'Base', Icons.cloud_rounded],
+    ['Космос', 'Space', Icons.public_rounded],
+    ['Природа', 'Nature', Icons.eco_rounded],
+    ['Ретро', 'Retro', Icons.tv_rounded],
+    ['Абстракция', 'Abstract', Icons.insights_rounded],
+    ['Уют', 'Cozy', Icons.location_city_rounded],
+  ];
+
+  @override
+  Widget build(BuildContext context) {
+    final t = widget.theme;
+    return Dialog(
+      backgroundColor: Colors.transparent,
+      insetPadding: EdgeInsets.all(sc(20)),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(24),
+        child: BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 24, sigmaY: 24),
+          child: Container(
+            width: 720,
+            height: 560,
+            padding: EdgeInsets.all(sc(20)),
+            decoration: BoxDecoration(
+              color: (t.isDark ? const Color(0xFF0B0E14) : Colors.white)
+                  .withOpacity(t.isDark ? 0.92 : 0.96),
+              borderRadius: BorderRadius.circular(24),
+              border: Border.all(
+                  color: Colors.white.withOpacity(t.isDark ? 0.15 : 0.6),
+                  width: 1),
+              boxShadow: [
+                BoxShadow(
+                    color: Colors.black.withOpacity(0.5),
+                    blurRadius: 40,
+                    offset: const Offset(0, 16)),
+              ],
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(children: [
+                  Icon(Icons.landscape_rounded,
+                      size: sc(18), color: t.accent),
+                  SizedBox(width: sc(8)),
+                  Text(tr('Галерея фонов', 'Background gallery'),
+                      style: TextStyle(
+                          fontSize: sc(16),
+                          fontWeight: FontWeight.w800,
+                          color: t.text)),
+                  const Spacer(),
+                  GestureDetector(
+                    onTap: () => Navigator.pop(context),
+                    child: Container(
+                      width: sc(30),
+                      height: sc(30),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.08),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Icon(Icons.close_rounded,
+                          size: sc(15), color: t.text.withOpacity(0.7)),
+                    ),
+                  ),
+                ]),
+                SizedBox(height: sc(14)),
+                SizedBox(
+                  height: sc(32),
+                  child: ListView(
+                    scrollDirection: Axis.horizontal,
+                    children: [
+                      for (var i = 0; i < _cats.length; i++) ...[
+                        if (i > 0) SizedBox(width: sc(6)),
+                        _filterChip(i),
+                      ],
+                    ],
+                  ),
+                ),
+                SizedBox(height: sc(14)),
+                Expanded(
+                  child: ValueListenableBuilder<int>(
+                    valueListenable: UiSettings.bgStyle,
+                    builder: (ctx, cur, _) {
+                      final items = <int>[];
+                      for (var i = 0; i < _SettingsPageState._bgStyles.length; i++) {
+                        if (_filter == 0) {
+                          items.add(i);
+                        } else {
+                          final cat = _SettingsPageState._bgStyles[i][3] as int;
+                          if (cat == _filter - 1) items.add(i);
+                        }
+                      }
+                      return GridView.builder(
+                        padding: EdgeInsets.zero,
+                        gridDelegate:
+                            SliverGridDelegateWithFixedCrossAxisCount(
+                          crossAxisCount: 5,
+                          mainAxisSpacing: sc(8),
+                          crossAxisSpacing: sc(8),
+                          childAspectRatio: 1.4,
+                        ),
+                        itemCount: items.length,
+                        itemBuilder: (c, idx) {
+                          final i = items[idx];
+                          final active = cur == i;
+                          final e = _SettingsPageState._bgStyles[i];
+                          return GestureDetector(
+                            behavior: HitTestBehavior.opaque,
+                            onTap: () {
+                              SoundService.toggle();
+                              UiSettings.bgStyle.value = i;
+                              UiSettings.save();
+                            },
+                            child: AnimatedContainer(
+                              duration: t.animDur,
+                              curve: t.animCurve,
+                              decoration: BoxDecoration(
+                                color: active
+                                    ? t.accent.withOpacity(0.8)
+                                    : t.card.withOpacity(0.5),
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(
+                                  color: active
+                                      ? t.accent
+                                      : Colors.white
+                                          .withOpacity(t.isDark ? 0.10 : 0.5),
+                                  width: active ? 2 : 1,
+                                ),
+                              ),
+                              padding: EdgeInsets.all(sc(8)),
+                              child: Column(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Icon(e[0] as IconData,
+                                        size: sc(20),
+                                        color: active
+                                            ? t.buttonTextColor
+                                            : t.text.withOpacity(0.6)),
+                                    SizedBox(height: sc(4)),
+                                    Text(tr(e[1] as String, e[2] as String),
+                                        textAlign: TextAlign.center,
+                                        style: TextStyle(
+                                            fontSize: sc(9),
+                                            fontWeight: FontWeight.w700,
+                                            color: active
+                                                ? t.buttonTextColor
+                                                : t.text.withOpacity(0.6)),
+                                        maxLines: 2,
+                                        overflow: TextOverflow.ellipsis),
+                                  ]),
+                            ),
+                          );
+                        },
+                      );
+                    },
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _filterChip(int i) {
+    final active = _filter == i;
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: () => setState(() => _filter = i),
+      child: AnimatedContainer(
+        duration: widget.theme.animDur,
+        padding: EdgeInsets.symmetric(horizontal: sc(12), vertical: sc(6)),
+        decoration: BoxDecoration(
+          color: active
+              ? widget.theme.accent.withOpacity(0.8)
+              : Colors.white.withOpacity(0.06),
+          borderRadius: BorderRadius.circular(999),
+          border: Border.all(
+              color: active
+                  ? widget.theme.accent
+                  : Colors.white.withOpacity(0.10)),
+        ),
+        child: Row(children: [
+          Icon(_cats[i][2] as IconData,
+              size: sc(12),
+              color: active
+                  ? widget.theme.buttonTextColor
+                  : widget.theme.text.withOpacity(0.7)),
+          SizedBox(width: sc(4)),
+          Text(tr(_cats[i][0] as String, _cats[i][1] as String),
+              style: TextStyle(
+                  fontSize: sc(10),
+                  fontWeight: FontWeight.w700,
+                  color: active
+                      ? widget.theme.buttonTextColor
+                      : widget.theme.text.withOpacity(0.8))),
+        ]),
+      ),
+    );
+  }
 }

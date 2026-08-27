@@ -13,12 +13,13 @@ class UiSettings {
   static final ValueNotifier<double> uiScale = ValueNotifier(1.0);
   static final ValueNotifier<bool> animationsEnabled = ValueNotifier(true);
   static final ValueNotifier<bool> closeToTray = ValueNotifier(true);
-  static final ValueNotifier<bool> sidebarRight = ValueNotifier(false);
+  static final ValueNotifier<int> sidebarPos =
+      ValueNotifier(0); // 0 лево, 1 право, 2 верх, 3 низ
   static final ValueNotifier<Color?> accentColor = ValueNotifier(null);
   static final ValueNotifier<Color?> buttonColor = ValueNotifier(null);
   static final ValueNotifier<bool> autoTheme = ValueNotifier(false);
-  static final ValueNotifier<int> themeFrom = ValueNotifier(19 * 60); // 🌙 с (минуты)
-  static final ValueNotifier<int> themeTo = ValueNotifier(7 * 60); // 🌙 до (минуты)
+  static final ValueNotifier<int> themeFrom = ValueNotifier(19 * 60);
+  static final ValueNotifier<int> themeTo = ValueNotifier(7 * 60);
   static final ValueNotifier<bool> alwaysOnTop = ValueNotifier(false);
   static final ValueNotifier<double> windowOpacity = ValueNotifier(1.0);
   static final ValueNotifier<int> fontMode = ValueNotifier(0);
@@ -49,6 +50,10 @@ class UiSettings {
   // ── графика ──
   static final ValueNotifier<int> fpsCap = ValueNotifier(24); // 12/24/30/60
   static final ValueNotifier<bool> ecoMode = ValueNotifier(false);
+  // 💤 фокус окна — AFK-оптимизация фона
+  static final ValueNotifier<bool> windowFocused = ValueNotifier(true);
+  // 🏁 разовое сообщение о финальном билде
+  static final ValueNotifier<bool> finalNoticeShown = ValueNotifier(false);
   static final ValueNotifier<bool> cardShadows = ValueNotifier(true);
 
   // ── звук ──
@@ -57,7 +62,7 @@ class UiSettings {
   static Map<String, String?> _sounds = {};
   static String? soundPath(String event) => _sounds[event];
 
-  // ── стекло (дефолт = iOS 26) ──
+  // ── стекло ──
   static final ValueNotifier<double> blurSigma = ValueNotifier(24.0);
   static final ValueNotifier<double> saturation = ValueNotifier(1.4);
   static final ValueNotifier<double> glassOpacity = ValueNotifier(0.42);
@@ -67,12 +72,10 @@ class UiSettings {
   static final ValueNotifier<double> glassRadius = ValueNotifier(24.0);
   static final ValueNotifier<Color> glassTint =
       ValueNotifier(const Color(0xFFFFFFFF).withOpacity(0.05));
-  // 🪶 настоящий BackdropFilter ВЫКЛЮЧЕН по умолчанию (как в Z2 Manager):
-  // на гладкой авроре стекло неотличимо, а GPU не платит за блюр каждый кадр
   static final ValueNotifier<bool> realBlur = ValueNotifier(false);
 
   static final Listenable general = Listenable.merge([
-    isDark, language, uiScale, animationsEnabled, closeToTray, sidebarRight,
+    isDark, language, uiScale, animationsEnabled, closeToTray, sidebarPos,
     accentColor, buttonColor, autoTheme, themeFrom, themeTo,
     alwaysOnTop, windowOpacity, fontMode,
     animSpeed, gradientAccent, accent2, noise, parallax, compactSidebar,
@@ -87,62 +90,63 @@ class UiSettings {
     liveBg, bgColor, auroraSpeed, bgStyle, bgDensity, fpsCap, ecoMode,
   ]);
   static final Listenable sound = Listenable.merge([soundEnabled, soundVolume]);
-  static final Listenable all = Listenable.merge([general, glass, aurora, sound]);
+  static final Listenable all =
+      Listenable.merge([general, glass, aurora, sound]);
 
   static File get _file =>
       File('${Platform.environment['APPDATA']}\\Z2Mini\\settings.json');
 
-  // ⚡ Дебаунсер: при частых изменениях (слайдеры) — пишем на диск раз в 300мс
   static Timer? _saveDebounce;
 
   static Map<String, dynamic> _toJson() => {
-    'isDark': isDark.value,
-    'lang': language.value,
-    'scale': uiScale.value,
-    'anim': animationsEnabled.value,
-    'tray': closeToTray.value,
-    'sideR': sidebarRight.value,
-    'accent': accentColor.value?.value,
-    'autoTh': autoTheme.value,
-    'thFrom': themeFrom.value,
-    'thTo': themeTo.value,
-    'aot': alwaysOnTop.value,
-    'wOp': windowOpacity.value,
-    'font': fontMode.value,
-    'animSp': animSpeed.value,
-    'grad': gradientAccent.value,
-    'accent2': accent2.value?.value,
-    'noise': noise.value,
-    'parallax': parallax.value,
-    'boot': bootEnabled.value,
-    'bootDur': bootDuration.value,
-    'bootCap': bootCaption.value,
-    'liveBg': liveBg.value,
-    'bg': bgColor.value?.value,
-    'auroraSp': auroraSpeed.value,
-    'bgStyle': bgStyle.value,
-    'bgDens': bgDensity.value,
-    'cSide': compactSidebar.value,
-    'vig': vignette.value,
-    'fps': fpsCap.value,
-    'eco': ecoMode.value,
-    'shadows': cardShadows.value,
-    'sound': soundEnabled.value,
-    'vol': soundVolume.value,
-    'sounds': _sounds,
-    'blur': blurSigma.value,
-    'sat': saturation.value,
-    'op': glassOpacity.value,
-    'glow': edgeGlow.value,
-    'border': borderOpacity.value,
-    'spec': specular.value,
-    'radius': glassRadius.value,
-    'tint': glassTint.value.value,
-    'rblur': realBlur.value,
-    'btn': buttonColor.value?.value,
-    'zpath': zapretPath.value,
-    'selcfg': selectedConfig.value,
-  };
+        'isDark': isDark.value,
+        'lang': language.value,
+        'scale': uiScale.value,
+        'anim': animationsEnabled.value,
+        'tray': closeToTray.value,
+        'sideP': sidebarPos.value,
+        'accent': accentColor.value?.value,
+        'autoTh': autoTheme.value,
+        'thFrom': themeFrom.value,
+        'thTo': themeTo.value,
+        'aot': alwaysOnTop.value,
+        'wOp': windowOpacity.value,
+        'font': fontMode.value,
+        'animSp': animSpeed.value,
+        'grad': gradientAccent.value,
+        'accent2': accent2.value?.value,
+        'noise': noise.value,
+        'parallax': parallax.value,
+        'boot': bootEnabled.value,
+        'bootDur': bootDuration.value,
+        'bootCap': bootCaption.value,
+        'liveBg': liveBg.value,
+        'bg': bgColor.value?.value,
+        'auroraSp': auroraSpeed.value,
+        'bgStyle': bgStyle.value,
+        'bgDens': bgDensity.value,
+        'cSide': compactSidebar.value,
+        'vig': vignette.value,
+        'fps': fpsCap.value,
+        'eco': ecoMode.value,
+        'shadows': cardShadows.value,
+        'sound': soundEnabled.value,
+        'vol': soundVolume.value,
+        'sounds': _sounds,
+        'blur': blurSigma.value,
+        'sat': saturation.value,
+        'op': glassOpacity.value,
+        'glow': edgeGlow.value,
+        'border': borderOpacity.value,
+        'spec': specular.value,
+        'radius': glassRadius.value,
+        'tint': glassTint.value.value,
+        'rblur': realBlur.value,
+        'btn': buttonColor.value?.value,
+        'zpath': zapretPath.value,
+        'selcfg': selectedConfig.value,
+        'finalNotice': finalNoticeShown.value,
+      };
 
   static void _writeDisk() {
     try {
@@ -165,46 +169,41 @@ class UiSettings {
         uiScale.value = d('scale', 1.0);
         animationsEnabled.value = b('anim', true);
         closeToTray.value = b('tray', true);
-        sidebarRight.value = b('sideR', false);
+        sidebarPos.value = (j['sideP'] ?? 0) as int;
         accentColor.value = c('accent');
         autoTheme.value = b('autoTh', false);
-      themeFrom.value = (j['thFrom'] ?? 19 * 60) as int;
-      themeTo.value = (j['thTo'] ?? 7 * 60) as int;
+        themeFrom.value = (j['thFrom'] ?? 19 * 60) as int;
+        themeTo.value = (j['thTo'] ?? 7 * 60) as int;
         alwaysOnTop.value = b('aot', false);
         windowOpacity.value = d('wOp', 1.0);
         fontMode.value = (j['font'] ?? 0) as int;
-
         animSpeed.value = d('animSp', 1.0);
         gradientAccent.value = b('grad', false);
         accent2.value = c('accent2');
         noise.value = b('noise', false);
         parallax.value = b('parallax', false);
-
         bootEnabled.value = b('boot', true);
         bootDuration.value = d('bootDur', 3.5);
         bootCaption.value = j['bootCap'] ?? '';
-
         liveBg.value = b('liveBg', true);
         bgColor.value = c('bg');
         auroraSpeed.value = d('auroraSp', 1.0);
-      bgStyle.value = (j['bgStyle'] ?? 0) as int;
-      bgDensity.value = d('bgDens', 1.0);
-      compactSidebar.value = b('cSide', false);
-      vignette.value = d('vig', 0.35);
-
+        bgStyle.value = (j['bgStyle'] ?? 0) as int;
+        bgDensity.value = d('bgDens', 1.0);
+        compactSidebar.value = b('cSide', false);
+        vignette.value = d('vig', 0.35);
         fpsCap.value = (j['fps'] ?? 24) as int;
         ecoMode.value = b('eco', false);
         cardShadows.value = b('shadows', true);
-
         soundEnabled.value = b('sound', true);
         soundVolume.value = d('vol', 0.3);
         zapretPath.value = j['zpath'];
         selectedConfig.value = j['selcfg'];
+        finalNoticeShown.value = b('finalNotice', false);
         final sm = j['sounds'];
         if (sm is Map) {
           _sounds = sm.map((k, v) => MapEntry(k as String, v as String?));
         }
-
         blurSigma.value = d('blur', 24.0);
         saturation.value = d('sat', 1.4);
         glassOpacity.value = d('op', 0.42);
@@ -220,13 +219,11 @@ class UiSettings {
     UiScale.value = uiScale.value;
   }
 
-  /// Отложенное сохранение (для слайдеров, частых изменений)
   static void save() {
     _saveDebounce?.cancel();
     _saveDebounce = Timer(const Duration(milliseconds: 300), _writeDisk);
   }
 
-  /// Немедленное сохранение (для выхода из приложения)
   static void saveImmediate() {
     _saveDebounce?.cancel();
     _writeDisk();
@@ -256,7 +253,7 @@ class UiSettings {
     uiScale.value = 1.0;
     animationsEnabled.value = true;
     closeToTray.value = true;
-    sidebarRight.value = false;
+    sidebarPos.value = 0;
     accentColor.value = null;
     autoTheme.value = false;
     themeFrom.value = 19 * 60;
