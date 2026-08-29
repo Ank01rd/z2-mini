@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'app_theme.dart';
 import 'ui_scale.dart';
+import 'preset_service.dart';
 
 class UiSettings {
   // ── интерфейс ──
@@ -44,6 +45,7 @@ class UiSettings {
   static final ValueNotifier<double> auroraSpeed = ValueNotifier(1.0);
   static final ValueNotifier<int> bgStyle = ValueNotifier(0);
   static final ValueNotifier<double> bgDensity = ValueNotifier(1.0);
+  static final ValueNotifier<String?> bgImagePath = ValueNotifier(null);
   static final ValueNotifier<bool> compactSidebar = ValueNotifier(false);
   static final ValueNotifier<double> vignette = ValueNotifier(0.35);
 
@@ -52,9 +54,21 @@ class UiSettings {
   static final ValueNotifier<bool> ecoMode = ValueNotifier(false);
   // 💤 фокус окна — AFK-оптимизация фона
   static final ValueNotifier<bool> windowFocused = ValueNotifier(true);
+    // 🎨 пользовательские пресеты
+  static final List<Preset> _userPresets = [];
+  static List<Preset> get userPresets => List.unmodifiable(_userPresets);
   // 🏁 разовое сообщение о финальном билде
-  static final ValueNotifier<bool> finalNoticeShown = ValueNotifier(false);
+   static final ValueNotifier<bool> finalNoticeShown = ValueNotifier(false);
+  static final ValueNotifier<String?> appliedPresetId = ValueNotifier(null);
   static final ValueNotifier<bool> cardShadows = ValueNotifier(true);
+    // ✨ визуальные фишки
+  static final ValueNotifier<bool> rippleFx = ValueNotifier(true);
+  static final ValueNotifier<bool> sweepFx = ValueNotifier(true);
+  static final ValueNotifier<bool> cursorGlow = ValueNotifier(true);
+  static final ValueNotifier<bool> pulseFx = ValueNotifier(true);
+  static final ValueNotifier<bool> clockOn = ValueNotifier(true);
+  static final ValueNotifier<bool> hotkeysOn = ValueNotifier(true);
+  static final ValueNotifier<int> toastStyle = ValueNotifier(0); // 0 стекло, 1 неон, 2 минимал
 
   // ── звук ──
   static final ValueNotifier<bool> soundEnabled = ValueNotifier(true);
@@ -80,14 +94,16 @@ class UiSettings {
     alwaysOnTop, windowOpacity, fontMode,
     animSpeed, gradientAccent, accent2, noise, parallax, compactSidebar,
     bootEnabled, bootDuration, bootCaption, vignette, selectedConfig,
-    cardShadows, ecoMode,
+    rippleFx, pulseFx, clockOn, hotkeysOn, toastStyle, sweepFx, pulseFx, rippleFx,
   ]);
   static final Listenable glass = Listenable.merge([
     blurSigma, saturation, glassOpacity, edgeGlow, borderOpacity,
     specular, glassRadius, glassTint, realBlur,
+    sweepFx, cursorGlow,
   ]);
   static final Listenable aurora = Listenable.merge([
     liveBg, bgColor, auroraSpeed, bgStyle, bgDensity, fpsCap, ecoMode,
+    bgImagePath,
   ]);
   static final Listenable sound = Listenable.merge([soundEnabled, soundVolume]);
   static final Listenable all =
@@ -125,6 +141,7 @@ class UiSettings {
         'auroraSp': auroraSpeed.value,
         'bgStyle': bgStyle.value,
         'bgDens': bgDensity.value,
+        'bgImg': bgImagePath.value,
         'cSide': compactSidebar.value,
         'vig': vignette.value,
         'fps': fpsCap.value,
@@ -145,7 +162,15 @@ class UiSettings {
         'btn': buttonColor.value?.value,
         'zpath': zapretPath.value,
         'selcfg': selectedConfig.value,
+        'presets': _userPresets.map((p) => p.toJson()).toList(),
         'finalNotice': finalNoticeShown.value,
+        'appliedPreset': appliedPresetId.value,
+        'rippleFx': rippleFx.value,
+        'sweepFx': sweepFx.value,
+        'pulseFx': pulseFx.value,
+        'clockOn': clockOn.value,
+        'hotkeys': hotkeysOn.value,
+        'toastSt': toastStyle.value,
       };
 
   static void _writeDisk() {
@@ -190,6 +215,7 @@ class UiSettings {
         auroraSpeed.value = d('auroraSp', 1.0);
         bgStyle.value = (j['bgStyle'] ?? 0) as int;
         bgDensity.value = d('bgDens', 1.0);
+        bgImagePath.value = j['bgImg'];
         compactSidebar.value = b('cSide', false);
         vignette.value = d('vig', 0.35);
         fpsCap.value = (j['fps'] ?? 24) as int;
@@ -200,6 +226,13 @@ class UiSettings {
         zapretPath.value = j['zpath'];
         selectedConfig.value = j['selcfg'];
         finalNoticeShown.value = b('finalNotice', false);
+        appliedPresetId.value = j['appliedPreset'];
+        rippleFx.value = b('rippleFx', true);
+        sweepFx.value = b('sweepFx', true);
+        pulseFx.value = b('pulseFx', true);
+        clockOn.value = b('clockOn', true);
+        hotkeysOn.value = b('hotkeys', true);
+        toastStyle.value = (j['toastSt'] ?? 0) as int;
         final sm = j['sounds'];
         if (sm is Map) {
           _sounds = sm.map((k, v) => MapEntry(k as String, v as String?));
@@ -213,6 +246,17 @@ class UiSettings {
         glassRadius.value = d('radius', 24.0);
         if (j['tint'] != null) glassTint.value = Color(j['tint'] as int);
         realBlur.value = b('rblur', false);
+        _userPresets.clear();
+        final pArr = j['presets'];
+        if (pArr is List) {
+          for (final p in pArr) {
+            if (p is Map) {
+              try {
+                _userPresets.add(Preset.fromJson(p.cast<String, dynamic>()));
+              } catch (_) {}
+            }
+          }
+        }
       }
     } catch (_) {}
     UiSettingsLang.ru = language.value == 'RU';
@@ -293,5 +337,103 @@ class UiSettings {
     language.value = v;
     UiSettingsLang.ru = v == 'RU';
     save();
+  }
+
+    // 📸 слепок текущих настроек (всё, что попадает в JSON)
+  static Map<String, dynamic> _snapshot() => _toJson()..remove('presets');
+
+  /// Применить пресет
+  static void applyPreset(Preset p) {
+    final d = p.data;
+    if (d.containsKey('isDark')) isDark.value = d['isDark'] as bool;
+    if (d['accent'] != null) accentColor.value = Color(d['accent'] as int);
+    else accentColor.value = null;
+    if (d['accent2'] != null) accent2.value = Color(d['accent2'] as int);
+    else accent2.value = null;
+    if (d.containsKey('grad')) gradientAccent.value = d['grad'] as bool;
+    if (d['btn'] != null) buttonColor.value = Color(d['btn'] as int);
+    else buttonColor.value = null;
+    if (d.containsKey('radius')) glassRadius.value = (d['radius'] as num).toDouble();
+    if (d.containsKey('blur')) blurSigma.value = (d['blur'] as num).toDouble();
+    if (d.containsKey('sat')) saturation.value = (d['sat'] as num).toDouble();
+    if (d.containsKey('op')) glassOpacity.value = (d['op'] as num).toDouble();
+    if (d.containsKey('glow')) edgeGlow.value = (d['glow'] as num).toDouble();
+    if (d.containsKey('border')) borderOpacity.value = (d['border'] as num).toDouble();
+    if (d.containsKey('spec')) specular.value = (d['spec'] as num).toDouble();
+    if (d['tint'] != null) glassTint.value = Color(d['tint'] as int);
+    if (d.containsKey('font')) fontMode.value = d['font'] as int;
+    if (d.containsKey('bgStyle')) bgStyle.value = d['bgStyle'] as int;
+    if (d['bg'] != null) bgColor.value = Color(d['bg'] as int);
+    else bgColor.value = null;
+    if (d.containsKey('auroraSp')) auroraSpeed.value = (d['auroraSp'] as num).toDouble();
+    if (d.containsKey('bgDens')) bgDensity.value = (d['bgDens'] as num).toDouble();
+    if (d.containsKey('vig')) vignette.value = (d['vig'] as num).toDouble();
+    if (d.containsKey('animSp')) animSpeed.value = (d['animSp'] as num).toDouble();
+    if (d.containsKey('fps')) fpsCap.value = d['fps'] as int;
+    if (d.containsKey('eco')) ecoMode.value = d['eco'] as bool;
+    if (d.containsKey('sideP')) sidebarPos.value = d['sideP'] as int;
+    if (d.containsKey('cSide')) compactSidebar.value = d['cSide'] as bool;
+    if (d.containsKey('liveBg')) liveBg.value = d['liveBg'] as bool;
+    appliedPresetId.value = p.id;
+    save();
+  }
+
+  /// Создать пользовательский пресет из текущих настроек
+  static Preset createUserPreset(String name, String description) {
+    final p = Preset(
+      id: 'user.${DateTime.now().millisecondsSinceEpoch}',
+      name: name,
+      description: description,
+      builtin: false,
+      data: _snapshot(),
+    );
+    _userPresets.add(p);
+    save();
+    return p;
+  }
+
+  static Map<String, dynamic> presetSnapshot() => _snapshot();
+
+  static bool updatePreset(String id, Map<String, dynamic> data) {
+    final i = _userPresets.indexWhere((p) => p.id == id);
+    if (i < 0) return false;
+    final old = _userPresets[i];
+    _userPresets[i] = Preset(
+        id: old.id,
+        name: old.name,
+        description: old.description,
+        builtin: false,
+        data: data);
+    save();
+    return true;
+  }
+
+  /// Импортировать из строки (share-код). null если невалидно.
+  static Preset? importFromString(String s) {
+    final p = Preset.import(s);
+    if (p == null) return null;
+    _userPresets.add(p);
+    save();
+    return p;
+  }
+
+  /// Удалить пользовательский пресет
+  static bool removePreset(String id) {
+    final idx = _userPresets.indexWhere((p) => p.id == id);
+    if (idx < 0) return false;
+    _userPresets.removeAt(idx);
+    save();
+    return true;
+  }
+
+  /// Экспорт текущего состояния в шар-строку
+  static String exportCurrent(String name, String description) {
+    final p = Preset(
+      id: 'share.${DateTime.now().millisecondsSinceEpoch}',
+      name: name,
+      description: description,
+      data: _snapshot(),
+    );
+    return p.export();
   }
 }

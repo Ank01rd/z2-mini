@@ -10,9 +10,12 @@ import 'ui/settings_page.dart';
 import 'ui/style/effects.dart';
 import 'ui/widgets/notify_bell.dart';
 import 'ui/widgets/boot_screen.dart';
+import 'ui/widgets/glass_clock.dart';
 import 'core/sound_service.dart';
 import 'services/update_service.dart';
 import 'core/notify_service.dart';
+import 'core/fx_service.dart';
+import 'ui/widgets/fx_overlay.dart';
 
 class Z2MiniApp extends StatelessWidget {
   const Z2MiniApp({super.key});
@@ -73,6 +76,7 @@ class _ShellState extends State<_Shell>
   final ValueNotifier<Offset> _par = ValueNotifier(Offset.zero);
   bool _dragging = false;
   int _dir = 1;
+  bool _zen = false;
 
   final ValueNotifier<int> _settingsCat = ValueNotifier(0);
 
@@ -84,6 +88,7 @@ class _ShellState extends State<_Shell>
     [Icons.graphic_eq_rounded, 'Звук', 'Sound'],
     [Icons.landscape_rounded, 'Фон', 'Background'],
     [Icons.monitor_rounded, 'Графика', 'Graphics'],
+    [Icons.bookmark_rounded, 'Пресеты', 'Presets'],
     [Icons.info_rounded, 'О программе', 'About'],
   ];
 
@@ -128,7 +133,6 @@ class _ShellState extends State<_Shell>
     );
   }
 
-    // 🏁 разовое сообщение: это последний крупный билд
   void _showFinalNotice() {
     if (!mounted || UiSettings.finalNoticeShown.value) return;
     showDialog(context: context, builder: (c) => const _FinalBuildDialog())
@@ -138,7 +142,6 @@ class _ShellState extends State<_Shell>
     });
   }
 
-
   @override
   void dispose() {
     windowManager.removeListener(this);
@@ -147,11 +150,13 @@ class _ShellState extends State<_Shell>
     super.dispose();
   }
 
-  // 💤 AFK: фокус/сворачивание → флаг, фон сам остановится
   @override
   void onWindowFocus() => UiSettings.windowFocused.value = true;
   @override
-  void onWindowBlur() => UiSettings.windowFocused.value = false;
+  void onWindowBlur() {
+    UiSettings.windowFocused.value = false;
+    FxService.cursor.value = null;
+  }
   @override
   void onWindowMinimize() => UiSettings.windowFocused.value = false;
   @override
@@ -185,11 +190,22 @@ class _ShellState extends State<_Shell>
   @override
   Widget build(BuildContext context) {
     return Listener(
-      onPointerDown: (_) => _dragging = true,
+      onPointerDown: (e) {
+        _dragging = true;
+        if (UiSettings.rippleFx.value) FxService.ripple(e.localPosition);
+      },
       onPointerUp: (_) => _dragging = false,
       onPointerCancel: (_) => _dragging = false,
-      onPointerMove: (e) {
-        if (!UiSettings.parallax.value || _dragging) {
+        onPointerHover: (e) {
+          if (UiSettings.cursorGlow.value) {
+            FxService.cursor.value = e.localPosition;
+          }
+        },
+        onPointerMove: (e) {
+          if (UiSettings.cursorGlow.value) {
+            FxService.cursor.value = e.localPosition;
+          }
+          if (!UiSettings.parallax.value || _dragging) {
           if (_par.value != Offset.zero) _par.value = Offset.zero;
           return;
         }
@@ -248,27 +264,63 @@ class _ShellState extends State<_Shell>
               ),
             ),
           ),
-          Scaffold(
-            backgroundColor: Colors.transparent,
-            body: ValueListenableBuilder<int>(
-              valueListenable: UiSettings.sidebarPos,
-              builder: (ctx, pos, _) {
-                final sb = _sidebar();
-                final content = Expanded(child: _content());
-                switch (pos) {
-                  case 1:
-                    return Row(children: [content, _divider(), sb]);
-                  case 2:
-                    return Column(children: [sb, _dividerH(), content]);
-                  case 3:
-                    return Column(children: [content, _dividerH(), sb]);
-                  default:
-                    return Row(children: [sb, _divider(), content]);
-                }
-              },
+          // 💧💫 ripple по клику + пульс при старте/стопе
+          const FxOverlay(),
+          if (!_zen)
+            Scaffold(
+              backgroundColor: Colors.transparent,
+              body: ValueListenableBuilder<int>(
+                valueListenable: UiSettings.sidebarPos,
+                builder: (ctx, pos, _) {
+                  final sb = _sidebar();
+                  final content = Expanded(child: _content());
+                  switch (pos) {
+                    case 1:
+                      return Row(children: [content, _divider(), sb]);
+                    case 2:
+                      return Column(children: [sb, _dividerH(), content]);
+                    case 3:
+                      return Column(children: [content, _dividerH(), sb]);
+                    default:
+                      return Row(children: [sb, _divider(), content]);
+                  }
+                },
+              ),
+            ),
+          if (!_zen) NotifyBell(theme: t, sidebarPos: UiSettings.sidebarPos),
+          Positioned(
+            right: sc(10),
+            bottom: sc(10),
+            child: MouseRegion(
+              cursor: SystemMouseCursors.click,
+              child: GestureDetector(
+                onTap: () {
+                  SoundService.click();
+                  setState(() => _zen = !_zen);
+                },
+                child: AnimatedOpacity(
+                  duration: const Duration(milliseconds: 200),
+                  opacity: _zen ? 0.6 : 0.25,
+                  child: Container(
+                    width: sc(34),
+                    height: sc(34),
+                    decoration: BoxDecoration(
+                      color: Colors.black.withOpacity(0.5),
+                      shape: BoxShape.circle,
+                      border:
+                          Border.all(color: Colors.white.withOpacity(0.15)),
+                    ),
+                    child: Icon(
+                        _zen
+                            ? Icons.visibility_rounded
+                            : Icons.visibility_off_rounded,
+                        size: sc(16),
+                        color: Colors.white.withOpacity(0.8)),
+                  ),
+                ),
+              ),
             ),
           ),
-          NotifyBell(theme: t, sidebarPos: UiSettings.sidebarPos),
           if (_boot)
             BootScreen(
               durationMs: (UiSettings.bootDuration.value * 1000).round(),
@@ -339,6 +391,11 @@ class _ShellState extends State<_Shell>
           height: sc(40),
           child: Row(children: [
             const Spacer(),
+            // 🕐 часы — рядом с кнопками окна
+            if (UiSettings.clockOn.value) ...[
+              const GlassClock(),
+              SizedBox(width: sc(6)),
+            ],
             _WinBtn(
                 kind: _G.min,
                 theme: t,
@@ -378,7 +435,7 @@ class _ShellState extends State<_Shell>
         },
       );
 
-      Widget _sidebarBody(bool hz) => ValueListenableBuilder<bool>(
+  Widget _sidebarBody(bool hz) => ValueListenableBuilder<bool>(
         valueListenable: UiSettings.compactSidebar,
         builder: (ctx, compact, _) {
           final thick = compact ? sc(56) : sc(84);
@@ -386,7 +443,6 @@ class _ShellState extends State<_Shell>
           final gap = sc(14);
           final onSettings = _page == 1;
 
-          // 🎯 СВЕРХУ/СНИЗУ + настройки → ОДНА центрированная лента [←][категории]
           if (hz && onSettings) {
             return AnimatedContainer(
               duration: const Duration(milliseconds: 260),
@@ -416,7 +472,6 @@ class _ShellState extends State<_Shell>
             );
           }
 
-          // 🧭 иначе — две кнопки Главная/Настройки с пилюлей
           final items = <Widget>[
             _item(0, Icons.home_rounded, tr('Главная', 'Home'), compact),
             SizedBox(width: gap, height: gap),
@@ -480,7 +535,6 @@ class _ShellState extends State<_Shell>
         },
       );
 
-    // 🔙 стрелка-назад в стиле обычного чипа
   Widget _backChip(bool compact) {
     final chip = GestureDetector(
       behavior: HitTestBehavior.opaque,
@@ -501,8 +555,7 @@ class _ShellState extends State<_Shell>
             borderRadius: BorderRadius.circular(12),
             border: Border.all(color: t.accent.withOpacity(0.4)),
           ),
-          child: Icon(Icons.arrow_back_rounded,
-              size: sc(15), color: t.accent),
+          child: Icon(Icons.arrow_back_rounded, size: sc(15), color: t.accent),
         ),
       ),
     );
@@ -516,7 +569,6 @@ class _ShellState extends State<_Shell>
         : chip;
   }
 
-  // 🏷 чип категории — уважает компактный режим
   Widget _catChip(int i, bool compact) {
     final e = _settingsCats[i];
     return ValueListenableBuilder<int>(
@@ -573,44 +625,6 @@ class _ShellState extends State<_Shell>
               )
             : chip;
       },
-    );
-  }
-
-  Widget _backButton(bool compact) {
-    return GestureDetector(
-      behavior: HitTestBehavior.opaque,
-      onTap: () {
-        SoundService.click();
-        _go(0);
-      },
-      child: MouseRegion(
-        cursor: SystemMouseCursors.click,
-        child: AnimatedContainer(
-          duration: t.animDur,
-          curve: t.animCurve,
-          width: compact ? sc(40) : sc(60),
-          height: compact ? sc(40) : sc(60),
-          decoration: BoxDecoration(
-            color: t.accent.withOpacity(0.15),
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: t.accent.withOpacity(0.4)),
-          ),
-          child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(Icons.arrow_back_rounded,
-                    size: sc(compact ? 17 : 19), color: t.accent),
-                if (!compact) ...[
-                  const SizedBox(height: 3),
-                  Text(tr('Назад', 'Back'),
-                      style: TextStyle(
-                          fontSize: sc(9),
-                          fontWeight: FontWeight.w700,
-                          color: t.accent)),
-                ],
-              ]),
-        ),
-      ),
     );
   }
 
@@ -787,9 +801,9 @@ class _FinalBuildDialog extends StatelessWidget {
               border: Border.all(color: Colors.white.withOpacity(0.15)),
               boxShadow: [
                 BoxShadow(
-                    color: Colors.black.withOpacity(0.5),
-                    blurRadius: 40,
-                    offset: const Offset(0, 16)),
+                  color: Colors.black.withOpacity(0.5),
+                  blurRadius: 40,
+                  offset: const Offset(0, 16)),
               ],
             ),
             child: Column(mainAxisSize: MainAxisSize.min, children: [
@@ -804,8 +818,8 @@ class _FinalBuildDialog extends StatelessWidget {
                       width: 1.5),
                   boxShadow: [
                     BoxShadow(
-                        color: const Color(0xFFB3E65C).withOpacity(0.25),
-                        blurRadius: 24),
+                      color: const Color(0xFFB3E65C).withOpacity(0.25),
+                      blurRadius: 24),
                   ],
                 ),
                 child: Icon(Icons.workspace_premium_rounded,

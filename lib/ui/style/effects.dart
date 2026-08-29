@@ -1,21 +1,24 @@
 import 'dart:math' as math;
 import 'dart:ui' as ui;
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
+import 'package:file_picker/file_picker.dart';
 import '../../core/ui_settings.dart';
+import '../../core/ui_scale.dart';
 
-/// 🎨 Общий helper: детерминированный «рандом» из seed для стабильной сцены
+/// 🎨 детерминированный «рандом» из seed
 double _jit(int i, double salt) {
   final x = math.sin(i * 12.9898 + salt * 78.233) * 43758.5453;
   return x - x.floor();
 }
 
-/// 🍃 дешёвое мягкое пятно: радиальный градиент вместо MaskFilter.blur
+/// 🍃 мягкое пятно: радиальный градиент вместо MaskFilter.blur
 Paint _soft(Color c, double r, Offset at) => Paint()
   ..shader = ui.Gradient.radial(at, r,
       [c, c.withOpacity(0.55), c.withOpacity(0)], [0.0, 0.45, 1.0]);
 
-/// 📦 кэш TextPainter: layout один раз — рисуем вечно
+/// 📦 кэш TextPainter
 final Map<int, TextPainter> _tpCache = {};
 TextPainter _cachedTp(String text, Color color, double size,
     {FontWeight? weight}) {
@@ -38,7 +41,7 @@ TextPainter _cachedTp(String text, Color color, double size,
   return tp;
 }
 
-/// Живой фон с 47 стилями
+/// Живой фон с 48 стилями
 class LiveBackground extends StatefulWidget {
   final Color color;
   final double speed;
@@ -72,9 +75,8 @@ class _LiveBackgroundState extends State<LiveBackground>
     }
     final dt = ms - _lastMs;
     final interval = 1000 ~/ _fps;
-    if (dt < interval) return; // лишние кадры пропускаем → GPU отдыхает
+    if (dt < interval) return;
     _lastMs = ms;
-    // время идёт реальными дельтами (кап 100мс — без скачков после паузы)
     _t += (dt / 1000.0).clamp(0.0, 0.1) * widget.speed * 0.25;
     setState(() {});
   }
@@ -93,7 +95,6 @@ class _LiveBackgroundState extends State<LiveBackground>
     super.dispose();
   }
 
-  // 💤 AFK: тикер стоит (0% GPU); при фокусе — сброс _lastMs и мгновенный кадр
   void _onFocus() {
     if (UiSettings.windowFocused.value) {
       if (!_ticker.isActive) {
@@ -106,240 +107,180 @@ class _LiveBackgroundState extends State<LiveBackground>
   }
 
   @override
-  Widget build(BuildContext context) =>
-      RepaintBoundary(child: _scene(_t));
+  Widget build(BuildContext context) => RepaintBoundary(child: _scene(_t));
 
   Widget _scene(double t) {
     switch (widget.style) {
-          case 0:
-            return CustomPaint(
-                painter: _AuroraPainter(t, widget.color, widget.density),
-                size: Size.infinite);
-          case 1:
-            return CustomPaint(
-                painter: _WavesPainter(t, widget.color, widget.density),
-                size: Size.infinite);
-          case 2:
-            return CustomPaint(
-                painter: _StarsPainter(t, widget.color, widget.density),
-                size: Size.infinite);
-          case 3:
-            return CustomPaint(
-                painter: _MyWavePainter(t, widget.color, widget.density),
-                size: Size.infinite);
-          case 4:
-            return CustomPaint(
-                painter: _CloudsPainter(t, widget.color, widget.density),
-                size: Size.infinite);
-          case 5:
-            return CustomPaint(
-                painter: _DucksPainter(t, widget.color, widget.density),
-                size: Size.infinite);
-          case 6:
-            return CustomPaint(
-                painter: _FrogsPainter(t, widget.color, widget.density),
-                size: Size.infinite);
-          case 7:
-            return CustomPaint(
-                painter: _DotsPainter(t, widget.color, widget.density),
-                size: Size.infinite);
-          case 8:
-            return CustomPaint(
-                painter: _AquariumPainter(t, widget.color, widget.density),
-                size: Size.infinite);
-          case 9:
-            return CustomPaint(
-                painter: _NebulaPainter(t, widget.color, widget.density),
-                size: Size.infinite);
-          case 10:
-            return CustomPaint(
-                painter: _BlackHolePainter(t, widget.color, widget.density),
-                size: Size.infinite);
-          case 11:
-            return CustomPaint(
-                painter: _CometPainter(t, widget.color, widget.density),
-                size: Size.infinite);
-          case 12:
-            return CustomPaint(
-                painter: _MeteorPainter(t, widget.color, widget.density),
-                size: Size.infinite);
-          case 13:
-            return CustomPaint(
-                painter: _OrbitsPainter(t, widget.color, widget.density),
-                size: Size.infinite);
-          case 14:
-            return CustomPaint(
-                painter: _MoonPainter(t, widget.color, widget.density),
-                size: Size.infinite);
-          case 15:
-            return CustomPaint(
-                painter: _StarDustPainter(t, widget.color, widget.density),
-                size: Size.infinite);
-          case 16:
-            return CustomPaint(
-                painter: _FirefliesPainter(t, widget.color, widget.density),
-                size: Size.infinite);
-          case 17:
-            return CustomPaint(
-                painter: _LeavesPainter(t, widget.color, widget.density),
-                size: Size.infinite);
-          case 18:
-            return CustomPaint(
-                painter: _SakuraPainter(t, widget.color, widget.density),
-                size: Size.infinite);
-          case 19:
-            return CustomPaint(
-                painter: _SnowPainter(t, widget.color, widget.density),
-                size: Size.infinite);
-          case 20:
-            return CustomPaint(
-                painter: _RainPainter(t, widget.color, widget.density),
-                size: Size.infinite);
-          case 21:
-            return CustomPaint(
-                painter: _RainDropsPainter(t, widget.color, widget.density),
-                size: Size.infinite);
-          case 22:
-            return CustomPaint(
-                painter: _SmokePainter(t, widget.color, widget.density),
-                size: Size.infinite);
-          case 23:
-            return CustomPaint(
-                painter: _DustLightPainter(t, widget.color, widget.density),
-                size: Size.infinite);
-          case 24:
-            return CustomPaint(
-                painter: _LavaLampPainter(t, widget.color, widget.density),
-                size: Size.infinite);
-          case 25:
-            return CustomPaint(
-                painter: _MatrixPainter(t, widget.color, widget.density),
-                size: Size.infinite);
-          case 26:
-            return CustomPaint(
-                painter: _SynthwavePainter(t, widget.color, widget.density),
-                size: Size.infinite);
-          case 27:
-            return CustomPaint(
-                painter: _CrtPainter(t, widget.color, widget.density),
-                size: Size.infinite);
-          case 28:
-            return CustomPaint(
-                painter: _TerminalPainter(t, widget.color, widget.density),
-                size: Size.infinite);
-          case 29:
-            return CustomPaint(
-                painter: _RadarPainter(t, widget.color, widget.density),
-                size: Size.infinite);
-          case 30:
-            return CustomPaint(
-                painter: _OscPainter(t, widget.color, widget.density),
-                size: Size.infinite);
-          case 31:
-            return CustomPaint(
-                painter: _VhsPainter(t, widget.color, widget.density),
-                size: Size.infinite);
-          case 32:
-            return CustomPaint(
-                painter: _PixelCloudsPainter(t, widget.color, widget.density),
-                size: Size.infinite);
-          case 33:
-            return CustomPaint(
-                painter: _RibbonsPainter(t, widget.color, widget.density),
-                size: Size.infinite);
-          case 34:
-            return CustomPaint(
-                painter: _KaleidoPainter(t, widget.color, widget.density),
-                size: Size.infinite);
-          case 35:
-            return CustomPaint(
-                painter: _MandalaPainter(t, widget.color, widget.density),
-                size: Size.infinite);
-          case 36:
-            return CustomPaint(
-                painter: _TopoPainter(t, widget.color, widget.density),
-                size: Size.infinite);
-          case 37:
-            return CustomPaint(
-                painter: _HexPainter(t, widget.color, widget.density),
-                size: Size.infinite);
-          case 38:
-            return CustomPaint(
-                painter: _PulsarPainter(t, widget.color, widget.density),
-                size: Size.infinite);
-          case 39:
-            return CustomPaint(
-                painter: _VoronoiPainter(t, widget.color, widget.density),
-                size: Size.infinite);
-          case 40:
-            return CustomPaint(
-                painter: _BubblesPainter(t, widget.color, widget.density),
-                size: Size.infinite);
-          case 41:
-            return CustomPaint(
-                painter: _NightCityPainter(t, widget.color, widget.density),
-                size: Size.infinite);
-          case 42:
-            return CustomPaint(
-                painter: _NeonPainter(t, widget.color, widget.density),
-                size: Size.infinite);
-          case 43:
-            return CustomPaint(
-                painter: _FireplacePainter(t, widget.color, widget.density),
-                size: Size.infinite);
-          case 44:
-            return CustomPaint(
-                painter: _VinylPainter(t, widget.color, widget.density),
-                size: Size.infinite);
-          case 45:
-            return CustomPaint(
-                painter: _ConfettiPainter(t, widget.color, widget.density),
-                size: Size.infinite);
-          case 46:
-            return CustomPaint(
-                painter: _PlanesPainter(t, widget.color, widget.density),
-                size: Size.infinite);
-          default:
-            return const SizedBox.shrink();
-        }
-      }
+      case 0:
+        return CustomPaint(painter: _AuroraPainter(t, widget.color, widget.density), size: Size.infinite);
+      case 1:
+        return CustomPaint(painter: _WavesPainter(t, widget.color, widget.density), size: Size.infinite);
+      case 2:
+        return CustomPaint(painter: _StarsPainter(t, widget.color, widget.density), size: Size.infinite);
+      case 3:
+        return CustomPaint(painter: _MyWavePainter(t, widget.color, widget.density), size: Size.infinite);
+      case 4:
+        return CustomPaint(painter: _CloudsPainter(t, widget.color, widget.density), size: Size.infinite);
+      case 5:
+        return CustomPaint(painter: _DucksPainter(t, widget.color, widget.density), size: Size.infinite);
+      case 6:
+        return CustomPaint(painter: _FrogsPainter(t, widget.color, widget.density), size: Size.infinite);
+      case 7:
+        return CustomPaint(painter: _DotsPainter(t, widget.color, widget.density), size: Size.infinite);
+      case 8:
+        return CustomPaint(painter: _AquariumPainter(t, widget.color, widget.density), size: Size.infinite);
+      case 9:
+        return CustomPaint(painter: _NebulaPainter(t, widget.color, widget.density), size: Size.infinite);
+      case 10:
+        return CustomPaint(painter: _BlackHolePainter(t, widget.color, widget.density), size: Size.infinite);
+      case 11:
+        return CustomPaint(painter: _CometPainter(t, widget.color, widget.density), size: Size.infinite);
+      case 12:
+        return CustomPaint(painter: _MeteorPainter(t, widget.color, widget.density), size: Size.infinite);
+      case 13:
+        return CustomPaint(painter: _OrbitsPainter(t, widget.color, widget.density), size: Size.infinite);
+      case 14:
+        return CustomPaint(painter: _MoonPainter(t, widget.color, widget.density), size: Size.infinite);
+      case 15:
+        return CustomPaint(painter: _StarDustPainter(t, widget.color, widget.density), size: Size.infinite);
+      case 16:
+        return CustomPaint(painter: _FirefliesPainter(t, widget.color, widget.density), size: Size.infinite);
+      case 17:
+        return CustomPaint(painter: _LeavesPainter(t, widget.color, widget.density), size: Size.infinite);
+      case 18:
+        return CustomPaint(painter: _SakuraPainter(t, widget.color, widget.density), size: Size.infinite);
+      case 19:
+        return CustomPaint(painter: _SnowPainter(t, widget.color, widget.density), size: Size.infinite);
+      case 20:
+        return CustomPaint(painter: _RainPainter(t, widget.color, widget.density), size: Size.infinite);
+      case 21:
+        return CustomPaint(painter: _RainDropsPainter(t, widget.color, widget.density), size: Size.infinite);
+      case 22:
+        return CustomPaint(painter: _SmokePainter(t, widget.color, widget.density), size: Size.infinite);
+      case 23:
+        return CustomPaint(painter: _DustLightPainter(t, widget.color, widget.density), size: Size.infinite);
+      case 24:
+        return CustomPaint(painter: _LavaLampPainter(t, widget.color, widget.density), size: Size.infinite);
+      case 25:
+        return CustomPaint(painter: _MatrixPainter(t, widget.color, widget.density), size: Size.infinite);
+      case 26:
+        return CustomPaint(painter: _SynthwavePainter(t, widget.color, widget.density), size: Size.infinite);
+      case 27:
+        return CustomPaint(painter: _CrtPainter(t, widget.color, widget.density), size: Size.infinite);
+      case 28:
+        return CustomPaint(painter: _TerminalPainter(t, widget.color, widget.density), size: Size.infinite);
+      case 29:
+        return CustomPaint(painter: _RadarPainter(t, widget.color, widget.density), size: Size.infinite);
+      case 30:
+        return CustomPaint(painter: _OscPainter(t, widget.color, widget.density), size: Size.infinite);
+      case 31:
+        return CustomPaint(painter: _VhsPainter(t, widget.color, widget.density), size: Size.infinite);
+      case 32:
+        return CustomPaint(painter: _PixelCloudsPainter(t, widget.color, widget.density), size: Size.infinite);
+      case 33:
+        return CustomPaint(painter: _RibbonsPainter(t, widget.color, widget.density), size: Size.infinite);
+      case 34:
+        return CustomPaint(painter: _KaleidoPainter(t, widget.color, widget.density), size: Size.infinite);
+      case 35:
+        return CustomPaint(painter: _MandalaPainter(t, widget.color, widget.density), size: Size.infinite);
+      case 36:
+        return CustomPaint(painter: _TopoPainter(t, widget.color, widget.density), size: Size.infinite);
+      case 37:
+        return CustomPaint(painter: _HexPainter(t, widget.color, widget.density), size: Size.infinite);
+      case 38:
+        return CustomPaint(painter: _PulsarPainter(t, widget.color, widget.density), size: Size.infinite);
+      case 39:
+        return CustomPaint(painter: _VoronoiPainter(t, widget.color, widget.density), size: Size.infinite);
+      case 40:
+        return CustomPaint(painter: _BubblesPainter(t, widget.color, widget.density), size: Size.infinite);
+      case 41:
+        return CustomPaint(painter: _NightCityPainter(t, widget.color, widget.density), size: Size.infinite);
+      case 42:
+        return CustomPaint(painter: _NeonPainter(t, widget.color, widget.density), size: Size.infinite);
+      case 43:
+        return CustomPaint(painter: _FireplacePainter(t, widget.color, widget.density), size: Size.infinite);
+      case 44:
+        return CustomPaint(painter: _VinylPainter(t, widget.color, widget.density), size: Size.infinite);
+      case 45:
+        return CustomPaint(painter: _ConfettiPainter(t, widget.color, widget.density), size: Size.infinite);
+      case 46:
+        return CustomPaint(painter: _PlanesPainter(t, widget.color, widget.density), size: Size.infinite);
+      case 47:
+        return _ImageBg(path: UiSettings.bgImagePath.value);
+      default:
+        return const SizedBox.shrink();
     }
+  }
+}
 
-// ═══════════════════════════════════════════════════════════
-// БАЗА (старые 9)
-// ═══════════════════════════════════════════════════════════
+// ═══════════════════ БАЗА ═══════════════════
+
+class _Blob {
+  final int fx, fy;
+  final double px, py;
+  final double ax, ay;
+  final double r;
+  final double o;
+  const _Blob(this.fx, this.fy, this.px, this.py, this.ax, this.ay, this.r,
+      this.o);
+}
 
 class _AuroraPainter extends CustomPainter {
   final double t;
   final Color base;
   final double d;
   _AuroraPainter(this.t, this.base, this.d);
+
+  static const double _tau = 2 * math.pi;
+  static const List<_Blob> _blobs = [
+    _Blob(1, 1, 0.00, 0.10, 0.38, 0.32, 0.45, 0.45),
+    _Blob(1, 2, 0.35, 0.60, 0.34, 0.38, 0.38, 0.34),
+    _Blob(2, 1, 0.62, 0.25, 0.30, 0.34, 0.34, 0.30),
+    _Blob(2, 3, 0.80, 0.45, 0.26, 0.26, 0.28, 0.24),
+    _Blob(3, 2, 0.15, 0.85, 0.22, 0.22, 0.24, 0.20),
+  ];
+
   @override
   void paint(Canvas canvas, Size size) {
-    final w = size.width, h = size.height;
-    final p = Paint()..blendMode = ui.BlendMode.plus;
-    for (var i = 0; i < 4; i++) {
-      final path = Path();
-      final yBase = h * (0.35 + 0.05 * i);
-      path.moveTo(-50, yBase);
-      for (double x = -50; x <= w + 50; x += 30) {
-        final y = yBase +
-            math.sin(x * 0.005 + t * 2 + i) * 60 * d +
-            math.sin(x * 0.012 - t * 1.5 + i * 2) * 30;
-        path.lineTo(x, y);
-      }
-      path.lineTo(w + 50, h + 50);
-      path.lineTo(-50, h + 50);
-      path.close();
-      p.shader = ui.Gradient.linear(
-          Offset(0, yBase - 80), Offset(0, h),
-          [base.withOpacity(0.25), base.withOpacity(0.05), Colors.transparent]);
-      canvas.drawPath(path, p);
+    final w = size.width;
+    final h = size.height;
+    if (w <= 0 || h <= 0) return;
+    // _t в effects идёт в 8.5 раз быстрее, чем в исходной AuroraBG
+    // (0.25*speed против speed/34) — замедляем до родного цикла ~34с
+    final t = this.t / 8.5;
+    final op = d.clamp(0.5, 1.5);
+    for (final b in _blobs) {
+      final x = w * (0.5 + b.ax * math.sin(_tau * (t * b.fx + b.px)));
+      final y = h * (0.5 + b.ay * math.cos(_tau * (t * b.fy + b.py)));
+      final r = math.max(w, h) * b.r * (0.9 + 0.1 * math.sin(_tau * (t + b.px)));
+      final rect = Rect.fromLTRB(x - r, y - r, x + r, y + r);
+      canvas.drawRect(
+        rect,
+        Paint()
+          ..shader = ui.Gradient.radial(
+            Offset(x, y),
+            r,
+            [base.withOpacity(b.o * op), base.withOpacity(0.0)],
+          ),
+      );
     }
+    // световое пятно
+    final sx = w * (0.5 + 0.35 * math.sin(_tau * (t * 2 + 0.5)));
+    final sy = h * (0.5 + 0.30 * math.cos(_tau * (t * 3 + 0.2)));
+    final sr = math.max(w, h) * 0.18;
+    canvas.drawRect(
+      Rect.fromLTRB(sx - sr, sy - sr, sx + sr, sy + sr),
+      Paint()
+        ..shader = ui.Gradient.radial(
+          Offset(sx, sy),
+          sr,
+          [Colors.white.withOpacity(0.05), Colors.white.withOpacity(0.0)],
+        ),
+    );
   }
 
   @override
-  bool shouldRepaint(covariant _AuroraPainter o) => o.t != t;
+  bool shouldRepaint(covariant _AuroraPainter old) => old.t != t;
 }
 
 class _WavesPainter extends CustomPainter {
@@ -388,9 +329,7 @@ class _StarsPainter extends CustomPainter {
       final ph = _jit(i, 0.57);
       final twinkle = 0.3 + 0.7 * (0.5 + 0.5 * math.sin(t * 4 + ph * 10));
       canvas.drawCircle(
-          Offset(x, y),
-          r,
-          Paint()..color = base.withOpacity(twinkle));
+          Offset(x, y), r, Paint()..color = base.withOpacity(twinkle));
     }
   }
 
@@ -407,8 +346,7 @@ class _MyWavePainter extends CustomPainter {
   void paint(Canvas canvas, Size size) {
     final w = size.width, h = size.height;
     final p = Paint()
-      ..shader = ui.Gradient.linear(
-          Offset(0, 0), Offset(w, h),
+      ..shader = ui.Gradient.linear(Offset(0, 0), Offset(w, h),
           [base.withOpacity(0.4), base.withOpacity(0.1)]);
     final path = Path();
     path.moveTo(0, h / 2);
@@ -436,20 +374,35 @@ class _CloudsPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final w = size.width, h = size.height;
-    final n = (10 * d).round().clamp(4, 20);
+    final n = (6 * d).round().clamp(3, 12);
     for (var i = 0; i < n; i++) {
-      final speed = 0.1 + _jit(i, 0.3) * 0.3;
-      var x = ((_jit(i, 0.7) * w + t * speed * 60) % (w + 300)) - 150;
-      final y = _jit(i, 0.9) * h * 0.8 + h * 0.1;
-      final r = 60 + _jit(i, 0.5) * 80;
-      final c = base.withOpacity(0.10 + 0.04 * _jit(i, 0.2));
-      final R = r * 1.8;
-      canvas.drawCircle(Offset(x, y), R, _soft(c, R, Offset(x, y)));
-      canvas.drawCircle(Offset(x + r * 0.5, y - r * 0.2), R * 0.8,
-          _soft(c, R * 0.8, Offset(x + r * 0.5, y - r * 0.2)));
-      canvas.drawCircle(Offset(x - r * 0.5, y + r * 0.1), R * 0.7,
-          _soft(c, R * 0.7, Offset(x - r * 0.5, y + r * 0.1)));
+      final s = 90.0 + _jit(i, 0.5) * 130;
+      final depth = s / 220;
+      final speed = 0.06 + depth * 0.18;
+      final span = w + s * 4;
+      var x = ((_jit(i, 0.7) * span + t * speed * 60) % span) - s * 2;
+      final y = _jit(i, 0.9) * h * 0.65 + h * 0.10;
+      final bob = math.sin(t * 0.4 + i * 1.7) * 5;
+      final alpha = 0.08 + 0.10 * _jit(i, 0.2) + depth * 0.05;
+      _cloud(canvas, Offset(x, y + bob), s, base.withOpacity(alpha));
     }
+  }
+
+  void _cloud(Canvas canvas, Offset o, double s, Color col) {
+    final p = Paint()
+      ..color = col
+      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 10);
+    final path = Path();
+    path.addRRect(RRect.fromRectAndRadius(
+        Rect.fromLTWH(o.dx - s, o.dy - s * 0.30, s * 2, s * 0.65),
+        Radius.circular(s * 0.32)));
+    path.addOval(Rect.fromCircle(
+        center: Offset(o.dx - s * 0.45, o.dy - s * 0.28), radius: s * 0.42));
+    path.addOval(Rect.fromCircle(
+        center: Offset(o.dx - s * 0.02, o.dy - s * 0.50), radius: s * 0.56));
+    path.addOval(Rect.fromCircle(
+        center: Offset(o.dx + s * 0.48, o.dy - s * 0.22), radius: s * 0.40));
+    canvas.drawPath(path, p);
   }
 
   @override
@@ -474,14 +427,10 @@ class _DucksPainter extends CustomPainter {
       canvas.translate(x, y);
       canvas.scale(scale, scale);
       final p = Paint()..color = base.withOpacity(0.8);
-      // тело
       canvas.drawOval(Rect.fromLTWH(-18, -6, 36, 18), p);
-      // голова
       canvas.drawCircle(const Offset(20, -8), 9, p);
-      // клюв
       canvas.drawOval(Rect.fromLTWH(26, -9, 8, 4),
           Paint()..color = const Color(0xFFFFA500));
-      // глаз
       canvas.drawCircle(const Offset(22, -10), 1.5,
           Paint()..color = Colors.black);
       canvas.restore();
@@ -643,9 +592,7 @@ class _AquariumPainter extends CustomPainter {
   bool shouldRepaint(covariant _AquariumPainter o) => o.t != t;
 }
 
-// ═══════════════════════════════════════════════════════════
-// 🌌 КОСМОС (9-15)
-// ═══════════════════════════════════════════════════════════
+// ═══════════════════ КОСМОС ═══════════════════
 
 class _NebulaPainter extends CustomPainter {
   final double t;
@@ -685,18 +632,15 @@ class _BlackHolePainter extends CustomPainter {
     final w = size.width, h = size.height;
     final cx = w / 2, cy = h / 2;
     final rMax = math.min(w, h) * 0.45;
-    // аккреционный диск
-    final p = Paint()..blendMode = ui.BlendMode.plus;
+    final p = Paint(); // БЕЗ BlendMode.plus
     for (var ring = 0; ring < 30; ring++) {
       final r = rMax * (0.4 + ring / 30 * 0.6);
-      final alpha = (1 - ring / 30) * 0.18;
+      final alpha = (1 - ring / 30) * 0.25;
       p.color = base.withOpacity(alpha);
       p.style = PaintingStyle.stroke;
       p.strokeWidth = 2;
-      canvas.drawOval(
-          Rect.fromCircle(center: Offset(cx, cy), radius: r), p);
+      canvas.drawOval(Rect.fromCircle(center: Offset(cx, cy), radius: r), p);
     }
-    // частицы по спирали
     final n = (80 * d).round().clamp(30, 150);
     for (var i = 0; i < n; i++) {
       final ph = _jit(i, 0.11) * _tau;
@@ -710,11 +654,7 @@ class _BlackHolePainter extends CustomPainter {
       canvas.drawCircle(Offset(x, y), sz,
           Paint()..color = base.withOpacity((1 - life) * 0.9));
     }
-    // чёрная дыра
-    canvas.drawCircle(
-        Offset(cx, cy),
-        rMax * 0.35,
-        Paint()..color = Colors.black);
+    canvas.drawCircle(Offset(cx, cy), rMax * 0.35, Paint()..color = Colors.black);
     canvas.drawCircle(
         Offset(cx, cy),
         rMax * 0.38,
@@ -742,7 +682,6 @@ class _CometPainter extends CustomPainter {
       final life = (t * spd + ph) % 1.0;
       final x = -100 + life * (w + 200);
       final y = _jit(i, 0.5) * h * 0.7 + h * 0.15;
-      // хвост
       final path = Path()
         ..moveTo(x, y)
         ..lineTo(x - 200, y + 40);
@@ -760,15 +699,11 @@ class _CometPainter extends CustomPainter {
                 [base.withOpacity(0.8), Colors.transparent])
             ..strokeWidth = 2.5
             ..style = PaintingStyle.stroke);
-      // голова
       canvas.drawCircle(Offset(x, y), 4, Paint()..color = Colors.white);
-      // искры в хвосте
       for (var k = 0; k < 12; k++) {
         final kx = x - k * 16 - _jit(i + k, 0.1) * 10;
         final ky = y + k * 3 + _jit(i + k, 0.3) * 20 - 10;
-        canvas.drawCircle(
-            Offset(kx, ky),
-            0.5 + _jit(i + k, 0.5) * 1.5,
+        canvas.drawCircle(Offset(kx, ky), 0.5 + _jit(i + k, 0.5) * 1.5,
             Paint()..color = base.withOpacity(1 - k / 12));
       }
     }
@@ -836,14 +771,11 @@ class _OrbitsPainter extends CustomPainter {
       final x = cx + math.cos(angle) * r;
       final y = cy + math.sin(angle) * r;
       final sz = 3 + (n - i).toDouble();
-      // трейл
       for (var k = 0; k < 20; k++) {
         final ta = angle - k * 0.05;
         final tx = cx + math.cos(ta) * r;
         final ty = cy + math.sin(ta) * r;
-        canvas.drawCircle(
-            Offset(tx, ty),
-            sz * (1 - k / 20),
+        canvas.drawCircle(Offset(tx, ty), sz * (1 - k / 20),
             Paint()..color = base.withOpacity((1 - k / 20) * 0.5));
       }
       canvas.drawCircle(Offset(x, y), sz, Paint()..color = base);
@@ -865,19 +797,14 @@ class _MoonPainter extends CustomPainter {
     final w = size.width, h = size.height;
     final r = math.min(w, h) * 0.12;
     final mx = w * 0.75, my = h * 0.25;
-    // луна
     canvas.drawCircle(
-        Offset(mx, my),
-        r,
-        Paint()..color = const Color(0xFFF5F5DC).withOpacity(0.9));
+        Offset(mx, my), r, Paint()..color = const Color(0xFFF5F5DC).withOpacity(0.9));
     canvas.drawCircle(
         Offset(mx, my),
         r,
         Paint()
-          ..shader = ui.Gradient.radial(
-              Offset(mx, my), r * 1.5,
+          ..shader = ui.Gradient.radial(Offset(mx, my), r * 1.5,
               [Colors.white.withOpacity(0.3), Colors.transparent]));
-    // облака
     final n = (8 * d).round().clamp(4, 14);
     final c = base.withOpacity(0.25);
     for (var i = 0; i < n; i++) {
@@ -905,7 +832,7 @@ class _StarDustPainter extends CustomPainter {
     final w = size.width, h = size.height;
     final n = (200 * d).round().clamp(60, 400);
     for (var i = 0; i < n; i++) {
-      final layer = _jit(i, 0.11) * 3; // параллакс слои
+      final layer = _jit(i, 0.11) * 3;
       final spd = 0.05 + layer * 0.08;
       var x = ((_jit(i, 0.31) * w + t * spd * 40) % w);
       final y = _jit(i, 0.71) * h;
@@ -920,9 +847,7 @@ class _StarDustPainter extends CustomPainter {
   bool shouldRepaint(covariant _StarDustPainter o) => o.t != t;
 }
 
-// ═══════════════════════════════════════════════════════════
-// 🌿 ПРИРОДА (16-24)
-// ═══════════════════════════════════════════════════════════
+// ═══════════════════ ПРИРОДА ═══════════════════
 
 class _FirefliesPainter extends CustomPainter {
   final double t;
@@ -940,7 +865,6 @@ class _FirefliesPainter extends CustomPainter {
       final x = bx + math.sin(t * 0.7 + ph) * 40;
       final y = by + math.cos(t * 0.5 + ph * 1.3) * 30;
       final pulse = 0.3 + 0.7 * (0.5 + 0.5 * math.sin(t * 4 + ph));
-      // ореол
       canvas.drawCircle(Offset(x, y), 16,
           _soft(base.withOpacity(pulse * 0.5), 16, Offset(x, y)));
       canvas.drawCircle(Offset(x, y), 1.5,
@@ -971,8 +895,7 @@ class _LeavesPainter extends CustomPainter {
       canvas.save();
       canvas.translate(x, y);
       canvas.rotate(rot);
-      canvas.drawOval(
-          Rect.fromLTWH(-6, -3, 12, 6),
+      canvas.drawOval(Rect.fromLTWH(-6, -3, 12, 6),
           Paint()..color = base.withOpacity(0.7));
       canvas.restore();
     }
@@ -1006,8 +929,7 @@ class _SakuraPainter extends CustomPainter {
       for (var k = 0; k < 5; k++) {
         canvas.save();
         canvas.rotate(k * 6.28 / 5);
-        canvas.drawOval(
-            Rect.fromLTWH(-sz * 0.4, -sz, sz * 0.8, sz),
+        canvas.drawOval(Rect.fromLTWH(-sz * 0.4, -sz, sz * 0.8, sz),
             Paint()..color = pink.withOpacity(0.7));
         canvas.restore();
       }
@@ -1068,7 +990,6 @@ class _RainPainter extends CustomPainter {
       final x = _jit(i, 0.9) * w;
       canvas.drawLine(Offset(x, y), Offset(x - 3, y + 15), p);
     }
-    // круги от дождя
     for (var i = 0; i < n ~/ 2; i++) {
       final spd = 0.5 + _jit(i, 0.2) * 0.5;
       final ph = _jit(i, 0.5);
@@ -1117,8 +1038,7 @@ class _RainDropsPainter extends CustomPainter {
             ..style = PaintingStyle.stroke
             ..strokeWidth = 1.5
             ..color = base.withOpacity(0.4));
-      canvas.drawCircle(Offset(x, y), 3,
-          Paint()..color = base.withOpacity(0.6));
+      canvas.drawCircle(Offset(x, y), 3, Paint()..color = base.withOpacity(0.6));
     }
   }
 
@@ -1161,7 +1081,6 @@ class _DustLightPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final w = size.width, h = size.height;
-    // луч
     final path = Path()
       ..moveTo(w * 0.3, -50)
       ..lineTo(w * 0.6, h + 50)
@@ -1173,7 +1092,6 @@ class _DustLightPainter extends CustomPainter {
         Paint()
           ..shader = ui.Gradient.linear(Offset(w * 0.4, 0), Offset(w * 0.6, h),
               [base.withOpacity(0.15), Colors.transparent]));
-    // пылинки в луче
     final n = (100 * d).round().clamp(30, 250);
     for (var i = 0; i < n; i++) {
       final ph = _jit(i, 0.3) * 6.28;
@@ -1183,8 +1101,7 @@ class _DustLightPainter extends CustomPainter {
       final y = baseY + math.cos(t * 0.3 + ph) * 15;
       final r = 0.5 + _jit(i, 0.2) * 1;
       final tw = 0.4 + 0.6 * (0.5 + 0.5 * math.sin(t * 2 + i));
-      canvas.drawCircle(Offset(x, y), r,
-          Paint()..color = base.withOpacity(tw));
+      canvas.drawCircle(Offset(x, y), r, Paint()..color = base.withOpacity(tw));
     }
   }
 
@@ -1220,9 +1137,7 @@ class _LavaLampPainter extends CustomPainter {
   bool shouldRepaint(covariant _LavaLampPainter o) => o.t != t;
 }
 
-// ═══════════════════════════════════════════════════════════
-// 🕹 РЕТРО/ТЕХНО (25-32)
-// ═══════════════════════════════════════════════════════════
+// ═══════════════════ РЕТРО/ТЕХНО ═══════════════════
 
 class _MatrixPainter extends CustomPainter {
   final double t;
@@ -1265,32 +1180,26 @@ class _SynthwavePainter extends CustomPainter {
   void paint(Canvas canvas, Size size) {
     final w = size.width, h = size.height;
     final horizon = h * 0.55;
-    // полосатое солнце
     for (var i = 0; i < 8; i++) {
       final y = horizon - 80 + i * 10;
-      canvas.drawRect(
-          Rect.fromLTWH(w / 2 - 60, y, 120, 5),
+      canvas.drawRect(Rect.fromLTWH(w / 2 - 60, y, 120, 5),
           Paint()..color = base.withOpacity(0.4 - i * 0.04));
     }
     canvas.drawCircle(
         Offset(w / 2, horizon - 40),
         60,
         Paint()
-          ..shader = ui.Gradient.linear(
-              Offset(w / 2, horizon - 100), Offset(w / 2, horizon),
-              [base.withOpacity(0.8), base.withOpacity(0.3)]));
-    // сетка
+          ..shader = ui.Gradient.linear(Offset(w / 2, horizon - 100),
+              Offset(w / 2, horizon), [base.withOpacity(0.8), base.withOpacity(0.3)]));
     final p = Paint()
       ..style = PaintingStyle.stroke
       ..strokeWidth = 1
       ..color = base.withOpacity(0.5);
-    // горизонтали
     for (var i = 0; i < 20; i++) {
       final y = horizon + i * i * 2;
       if (y > h) break;
       canvas.drawLine(Offset(0, y), Offset(w, y), p);
     }
-    // вертикали (уходят в перспективу)
     final n = (15 * d).round().clamp(8, 20);
     for (var i = 0; i < n; i++) {
       final x = (i / (n - 1)) * w;
@@ -1313,18 +1222,15 @@ class _CrtPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final w = size.width, h = size.height;
-    // сканлайны
     final p = Paint()..color = Colors.black.withOpacity(0.15);
     for (double y = 0; y < h; y += 3) {
       canvas.drawRect(Rect.fromLTWH(0, y, w, 1), p);
     }
-    // шум
     final n = (200 * d).round().clamp(50, 400);
     for (var i = 0; i < n; i++) {
       final x = _jit(i, t.floor().toDouble() + 0.1) * w;
       final y = _jit(i, t.floor().toDouble() + 0.3) * h;
-      canvas.drawCircle(Offset(x, y), 1,
-          Paint()..color = base.withOpacity(0.3));
+      canvas.drawCircle(Offset(x, y), 1, Paint()..color = base.withOpacity(0.3));
     }
   }
 
@@ -1357,10 +1263,10 @@ class _TerminalPainter extends CustomPainter {
       if (y > h) continue;
       _cachedTp(txt, base.withOpacity(0.7), 14).paint(canvas, Offset(40, y));
     }
-    // курсор
     if (t.floor() % 2 == 0) {
       final lineIdx = (totalChars / 20).floor().clamp(0, lines.length - 1);
-      final charsShown = (totalChars - lineIdx * 20).clamp(0, lines[lineIdx].length);
+      final charsShown =
+          (totalChars - lineIdx * 20).clamp(0, lines[lineIdx].length);
       final y = 40.0 + lineIdx * 24;
       canvas.drawRect(Rect.fromLTWH(40 + charsShown * 8.4, y, 8, 18),
           Paint()..color = base);
@@ -1391,14 +1297,12 @@ class _RadarPainter extends CustomPainter {
     }
     canvas.drawLine(Offset(cx - r, cy), Offset(cx + r, cy), p);
     canvas.drawLine(Offset(cx, cy - r), Offset(cx, cy + r), p);
-    // развёртка
     final angle = t * 1.5;
-    final path = Path()
-      ..moveTo(cx, cy)
-      ..lineTo(cx + math.cos(angle) * r, cy + math.sin(angle) * r);
     canvas.drawPath(
-        path, Paint()..color = base..strokeWidth = 2..style = PaintingStyle.stroke);
-    // след
+        Path()
+          ..moveTo(cx, cy)
+          ..lineTo(cx + math.cos(angle) * r, cy + math.sin(angle) * r),
+        Paint()..color = base..strokeWidth = 2..style = PaintingStyle.stroke);
     for (var k = 0; k < 30; k++) {
       final a = angle - k * 0.03;
       canvas.drawPath(
@@ -1411,7 +1315,6 @@ class _RadarPainter extends CustomPainter {
           ..strokeWidth = 2,
       );
     }
-    // точки
     final n = (6 * d).round().clamp(3, 10);
     for (var i = 0; i < n; i++) {
       final br = _jit(i, 0.3);
@@ -1470,13 +1373,10 @@ class _VhsPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final w = size.width, h = size.height;
-    // сканлайны
     for (double y = 0; y < h; y += 2) {
-      canvas.drawRect(
-          Rect.fromLTWH(0, y, w, 1),
+      canvas.drawRect(Rect.fromLTWH(0, y, w, 1),
           Paint()..color = Colors.black.withOpacity(0.1));
     }
-    // горизонтальные помехи
     final n = (10 * d).round().clamp(4, 20);
     for (var i = 0; i < n; i++) {
       final y = ((_jit(i, t.floor().toDouble() + 0.5) * h) + t * 100) % h;
@@ -1506,7 +1406,6 @@ class _PixelCloudsPainter extends CustomPainter {
       var x = ((_jit(i, 0.7) * w * 2 + t * spd * 60) % (w + 200)) - 100;
       final y = (_jit(i, 0.9) * h * 0.7 + h * 0.15);
       final p = Paint()..color = base.withOpacity(0.6);
-      // пиксельное облако
       final shape = [
         [0, 1, 1, 1, 0],
         [1, 1, 1, 1, 1],
@@ -1515,8 +1414,7 @@ class _PixelCloudsPainter extends CustomPainter {
       for (var r = 0; r < shape.length; r++) {
         for (var c = 0; c < shape[r].length; c++) {
           if (shape[r][c] == 1) {
-            canvas.drawRect(
-                Rect.fromLTWH(x + c * px, y + r * px, px, px), p);
+            canvas.drawRect(Rect.fromLTWH(x + c * px, y + r * px, px, px), p);
           }
         }
       }
@@ -1527,9 +1425,7 @@ class _PixelCloudsPainter extends CustomPainter {
   bool shouldRepaint(covariant _PixelCloudsPainter o) => o.t != t;
 }
 
-// ═══════════════════════════════════════════════════════════
-// 🎨 АБСТРАКЦИЯ (33-40)
-// ═══════════════════════════════════════════════════════════
+// ═══════════════════ АБСТРАКЦИЯ ═══════════════════
 
 class _RibbonsPainter extends CustomPainter {
   final double t;
@@ -1547,7 +1443,8 @@ class _RibbonsPainter extends CustomPainter {
         final y = h / 2 +
             math.sin(x * 0.008 + t * (1 + i * 0.2) + ph) * 100 +
             math.cos(x * 0.015 - t * 0.7 + i) * 40 +
-            i * 20 - n * 10;
+            i * 20 -
+            n * 10;
         if (x <= -50) path.moveTo(x, y);
         else path.lineTo(x, y);
       }
@@ -1584,9 +1481,7 @@ class _KaleidoPainter extends CustomPainter {
         final a = math.sin(t + i * 0.5) * 0.5;
         final x = math.cos(a) * r;
         final y = math.sin(a) * r;
-        canvas.drawCircle(
-            Offset(x, y),
-            3 + math.sin(t + i) * 2,
+        canvas.drawCircle(Offset(x, y), 3 + math.sin(t + i) * 2,
             Paint()..color = base.withOpacity(0.6 - i * 0.04));
       }
       canvas.restore();
@@ -1744,7 +1639,6 @@ class _VoronoiPainter extends CustomPainter {
       final y = by + math.cos(t * 0.4 + i * 1.3) * 20;
       pts.add(Offset(x, y));
     }
-    // рёбра между ближайшими точками
     final p = Paint()
       ..style = PaintingStyle.stroke
       ..strokeWidth = 0.5
@@ -1752,9 +1646,7 @@ class _VoronoiPainter extends CustomPainter {
     for (var i = 0; i < n; i++) {
       for (var k = i + 1; k < n; k++) {
         final dist = (pts[i] - pts[k]).distance;
-        if (dist < 150) {
-          canvas.drawLine(pts[i], pts[k], p);
-        }
+        if (dist < 150) canvas.drawLine(pts[i], pts[k], p);
       }
       canvas.drawCircle(pts[i], 2, Paint()..color = base);
     }
@@ -1775,28 +1667,30 @@ class _BubblesPainter extends CustomPainter {
     final n = (25 * d).round().clamp(10, 60);
     for (var i = 0; i < n; i++) {
       final ph = _jit(i, 0.3) * 6.28;
-      final bx = _jit(i, 0.7) * w;
-      final by = _jit(i, 0.9) * h;
-      final x = bx + math.sin(t * 0.5 + ph) * 30;
-      final y = by + math.cos(t * 0.4 + ph) * 30;
-      final r = 10 + _jit(i, 0.5) * 30;
+      final spd = 0.05 + _jit(i, 0.11) * 0.10;
+      final life = (t * spd + _jit(i, 0.7)) % 1.0;
+      final x = _jit(i, 0.7) * w + math.sin(t * 0.5 + ph) * 30;
+      final y = h + 60 - life * (h + 120); // всплывают снизу вверх
+      final r = 8 + _jit(i, 0.5) * 34;
+      final fade =
+          life < 0.1 ? life / 0.1 : (life > 0.9 ? (1 - life) / 0.1 : 1.0);
+      final a = 0.35 * fade;
+      // тело пузыря (сплошной цвет — виден всегда)
       canvas.drawCircle(
-          Offset(x, y),
-          r,
-          Paint()
-            ..shader = ui.Gradient.radial(
-                Offset(x - r * 0.3, y - r * 0.3), r,
-                [base.withOpacity(0.3), base.withOpacity(0.1), Colors.transparent]));
+          Offset(x, y), r, Paint()..color = base.withOpacity(a * 0.35));
+      // ободок
       canvas.drawCircle(
           Offset(x, y),
           r,
           Paint()
             ..style = PaintingStyle.stroke
-            ..strokeWidth = 1
-            ..color = base.withOpacity(0.4));
+            ..strokeWidth = 1.4
+            ..color = base.withOpacity(a));
       // блик
-      canvas.drawCircle(Offset(x - r * 0.3, y - r * 0.3), r * 0.2,
-          Paint()..color = Colors.white.withOpacity(0.4));
+      canvas.drawCircle(
+          Offset(x - r * 0.35, y - r * 0.35),
+          r * 0.22,
+          Paint()..color = Colors.white.withOpacity(0.5 * fade));
     }
   }
 
@@ -1804,9 +1698,7 @@ class _BubblesPainter extends CustomPainter {
   bool shouldRepaint(covariant _BubblesPainter o) => o.t != t;
 }
 
-// ═══════════════════════════════════════════════════════════
-// 🏙 УЮТ (41-46)
-// ═══════════════════════════════════════════════════════════
+// ═══════════════════ УЮТ ═══════════════════
 
 class _NightCityPainter extends CustomPainter {
   final double t;
@@ -1817,25 +1709,23 @@ class _NightCityPainter extends CustomPainter {
   void paint(Canvas canvas, Size size) {
     final w = size.width, h = size.height;
     final ground = h * 0.7;
-    // здания
     final n = (20 * d).round().clamp(8, 30);
     for (var i = 0; i < n; i++) {
       final bw = 30 + _jit(i, 0.3) * 60;
       final bh = 50 + _jit(i, 0.7) * (h - ground - 50);
       final x = _jit(i, 0.9) * w;
       final y = ground - bh;
-      canvas.drawRect(
-          Rect.fromLTWH(x, y, bw, bh),
+      canvas.drawRect(Rect.fromLTWH(x, y, bw, bh),
           Paint()..color = Colors.black.withOpacity(0.8));
-      // окна
       final rows = (bh / 15).floor();
       final cols = (bw / 12).floor();
       for (var r = 0; r < rows; r++) {
         for (var c = 0; c < cols; c++) {
-          final on = ((_jit(i * 100 + r * 10 + c, 0.5) + math.sin(t * 0.1 + i + r) * 0.1) > 0.4);
+          final on = ((_jit(i * 100 + r * 10 + c, 0.5) +
+                  math.sin(t * 0.1 + i + r) * 0.1) >
+              0.4);
           if (on) {
-            canvas.drawRect(
-                Rect.fromLTWH(x + 4 + c * 12, y + 4 + r * 15, 6, 8),
+            canvas.drawRect(Rect.fromLTWH(x + 4 + c * 12, y + 4 + r * 15, 6, 8),
                 Paint()..color = base.withOpacity(0.8));
           }
         }
@@ -1893,18 +1783,14 @@ class _FireplacePainter extends CustomPainter {
   void paint(Canvas canvas, Size size) {
     final w = size.width, h = size.height;
     final cx = w / 2, baseY = h * 0.8;
-    // угли
     final n = (15 * d).round().clamp(6, 25);
     for (var i = 0; i < n; i++) {
       final x = cx + (_jit(i, 0.3) - 0.5) * 200;
       final y = baseY + _jit(i, 0.7) * 20;
       final pulse = 0.5 + 0.5 * math.sin(t * 3 + i);
-      canvas.drawCircle(
-          Offset(x, y),
-          4 + _jit(i, 0.9) * 4,
+      canvas.drawCircle(Offset(x, y), 4 + _jit(i, 0.9) * 4,
           Paint()..color = const Color(0xFFFF4500).withOpacity(pulse));
     }
-    // огонь
     final flames = 20;
     for (var i = 0; i < flames; i++) {
       final x = cx + (_jit(i, 0.1) - 0.5) * 120;
@@ -1919,11 +1805,12 @@ class _FireplacePainter extends CustomPainter {
       canvas.drawPath(
           path,
           Paint()
-            ..shader = ui.Gradient.linear(
-                Offset(x, baseY), Offset(x, baseY - flameH),
-                [const Color(0xFFFF8C00).withOpacity(0.7), const Color(0xFFFF4500).withOpacity(0.3), Colors.transparent]));
+            ..shader = ui.Gradient.linear(Offset(x, baseY), Offset(x, baseY - flameH), [
+              const Color(0xFFFF8C00).withOpacity(0.7),
+              const Color(0xFFFF4500).withOpacity(0.3),
+              Colors.transparent
+            ]));
     }
-    // искры
     final sparks = (20 * d).round().clamp(6, 40);
     for (var i = 0; i < sparks; i++) {
       final spd = 0.5 + _jit(i, 0.3) * 0.8;
@@ -1953,10 +1840,7 @@ class _VinylPainter extends CustomPainter {
     canvas.save();
     canvas.translate(cx, cy);
     canvas.rotate(t * 2);
-    // основа
-    canvas.drawCircle(Offset.zero, r,
-        Paint()..color = Colors.black.withOpacity(0.9));
-    // дорожки
+    canvas.drawCircle(Offset.zero, r, Paint()..color = Colors.black.withOpacity(0.9));
     for (var i = 5; i < 30; i++) {
       canvas.drawCircle(
           Offset.zero,
@@ -1966,17 +1850,13 @@ class _VinylPainter extends CustomPainter {
             ..strokeWidth = 0.3
             ..color = Colors.white.withOpacity(0.1));
     }
-    // этикетка
-    canvas.drawCircle(Offset.zero, r * 0.25,
-        Paint()..color = base.withOpacity(0.8));
-    // блик
+    canvas.drawCircle(Offset.zero, r * 0.25, Paint()..color = base.withOpacity(0.8));
     canvas.restore();
     canvas.drawCircle(
         Offset(cx - r * 0.3, cy - r * 0.3),
         r * 0.8,
         Paint()
-          ..shader = ui.Gradient.radial(
-              Offset(cx - r * 0.3, cy - r * 0.3), r * 0.8,
+          ..shader = ui.Gradient.radial(Offset(cx - r * 0.3, cy - r * 0.3), r * 0.8,
               [Colors.white.withOpacity(0.15), Colors.transparent]));
   }
 
@@ -2011,9 +1891,7 @@ class _ConfettiPainter extends CustomPainter {
       canvas.save();
       canvas.translate(x, y);
       canvas.rotate(rot);
-      canvas.drawRect(
-          Rect.fromLTWH(-4, -2, 8, 4),
-          Paint()..color = c.withOpacity(0.9));
+      canvas.drawRect(Rect.fromLTWH(-4, -2, 8, 4), Paint()..color = c.withOpacity(0.9));
       canvas.restore();
     }
   }
@@ -2036,21 +1914,18 @@ class _PlanesPainter extends CustomPainter {
       final ph = _jit(i, 0.7);
       final life = (t * spd + ph) % 1.0;
       final x = -50 + life * (w + 100);
-      final y = _jit(i, 0.9) * h * 0.7 + h * 0.15 +
-          math.sin(t * 2 + ph * 3) * 20;
+      final y = _jit(i, 0.9) * h * 0.7 + h * 0.15 + math.sin(t * 2 + ph * 3) * 20;
       final rot = math.sin(t + ph) * 0.3;
       canvas.save();
       canvas.translate(x, y);
       canvas.rotate(rot);
       final p = Paint()..color = base.withOpacity(0.8);
-      // треугольник-самолётик
       final path = Path()
         ..moveTo(-15, 0)
         ..lineTo(15, -4)
         ..lineTo(15, 4)
         ..close();
       canvas.drawPath(path, p);
-      // крыло
       canvas.drawPath(
           Path()
             ..moveTo(-5, 0)
@@ -2064,4 +1939,148 @@ class _PlanesPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant _PlanesPainter o) => o.t != t;
+}
+
+// ═══════════════════ 🖼 СВОЯ КАРТИНКА (47) ═══════════════════
+
+class _ImageBg extends StatefulWidget {
+  final String? path;
+  const _ImageBg({this.path});
+  @override
+  State<_ImageBg> createState() => _ImageBgState();
+}
+
+class _ImageBgState extends State<_ImageBg> {
+  ui.Image? _img;
+  bool _loading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  @override
+  void didUpdateWidget(covariant _ImageBg old) {
+    super.didUpdateWidget(old);
+    if (old.path != widget.path) _load();
+  }
+
+  Future<void> _load() async {
+    final p = widget.path;
+    if (p == null || p.isEmpty) {
+      if (mounted) {
+        setState(() {
+          _img = null;
+          _loading = false;
+        });
+      }
+      return;
+    }
+    setState(() => _loading = true);
+    try {
+      final f = File(p);
+      if (!await f.exists()) throw 0;
+      final bytes = await f.readAsBytes();
+      final codec = await ui.instantiateImageCodec(bytes);
+      final frame = await codec.getNextFrame();
+      if (mounted) {
+        setState(() {
+          _img = frame.image;
+          _loading = false;
+        });
+      }
+    } catch (_) {
+      if (mounted) {
+        setState(() {
+          _img = null;
+          _loading = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _pick() async {
+    final picked = await FilePicker.platform.pickFiles(type: FileType.image);
+    if (picked == null || picked.files.isEmpty) return;
+    final p = picked.files.first.path;
+    if (p == null) return;
+    UiSettings.bgImagePath.value = p;
+    UiSettings.save();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final img = _img;
+    if (img != null) {
+      return CustomPaint(painter: _ImagePainter(img), size: Size.infinite);
+    }
+    final ru = UiSettings.language.value == 'RU';
+    final label = _loading
+        ? (ru ? 'Загрузка…' : 'Loading…')
+        : (widget.path == null
+            ? (ru ? 'Выбрать свою картинку' : 'Pick your image')
+            : (ru ? 'Файл не найден — выбрать другой' : 'File not found'));
+    return Center(
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: _pick,
+        child: MouseRegion(
+          cursor: SystemMouseCursors.click,
+          child: Container(
+            padding: EdgeInsets.symmetric(horizontal: sc(24), vertical: sc(14)),
+            decoration: BoxDecoration(
+              color: Colors.black.withOpacity(0.55),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: Colors.white.withOpacity(0.15)),
+            ),
+            child: Row(mainAxisSize: MainAxisSize.min, children: [
+              Icon(Icons.image_rounded, size: sc(18), color: const Color(0xFF9aa4b2)),
+              SizedBox(width: sc(10)),
+              Text(
+                label,
+                style: TextStyle(
+                  fontSize: sc(13),
+                  fontWeight: FontWeight.w600,
+                  color: const Color(0xFF9aa4b2),
+                  decoration: TextDecoration.none,
+                ),
+              ),
+            ]),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _ImagePainter extends CustomPainter {
+  final ui.Image img;
+  _ImagePainter(this.img);
+  @override
+  void paint(Canvas canvas, Size size) {
+    final iw = img.width.toDouble(), ih = img.height.toDouble();
+    final s = math.max(size.width / iw, size.height / ih);
+    final dw = iw * s, dh = ih * s;
+    canvas.save();
+    canvas.translate((size.width - dw) / 2, (size.height - dh) / 2);
+    canvas.scale(s);
+    canvas.drawImage(img, Offset.zero, Paint()..filterQuality = FilterQuality.medium);
+    canvas.restore();
+    canvas.drawRect(
+      Rect.fromLTWH(0, 0, size.width, size.height),
+      Paint()..color = Colors.black.withOpacity(0.25),
+    );
+    canvas.drawRect(
+      Rect.fromLTWH(0, 0, size.width, size.height),
+      Paint()
+        ..shader = ui.Gradient.radial(
+            Offset(size.width / 2, size.height / 2),
+            math.max(size.width, size.height) * 0.75,
+            [Colors.transparent, Colors.black.withOpacity(0.35)]),
+    );
+  }
+
+  @override
+  bool shouldRepaint(covariant _ImagePainter old) => old.img != img;
 }

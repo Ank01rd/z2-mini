@@ -10,6 +10,7 @@ import 'liquid_glass_container.dart';
 import 'style/widgets.dart';
 import '../core/sound_service.dart';
 import '../core/notify_service.dart';
+import '../core/fx_service.dart';
 
 class HomePage extends StatefulWidget {
   final AppTheme theme;
@@ -26,6 +27,20 @@ class _HomePageState extends State<HomePage> {
   String _gameFilter = 'all', _ipsetFilter = 'loaded';
   String _cfgFilter = 'all';
   AppTheme get t => widget.theme;
+
+    final GlobalKey _startKey = GlobalKey();
+  final GlobalKey _stopKey = GlobalKey();
+  final GlobalKey _restartKey = GlobalKey();
+
+  void _firePulse(GlobalKey key) {
+    if (!UiSettings.pulseFx.value) return;
+    final ctx = key.currentContext;
+    if (ctx == null) return;
+    final box = ctx.findRenderObject();
+    if (box is RenderBox && box.attached) {
+      FxService.pulse(box.localToGlobal(box.size.center(Offset.zero)));
+    }
+  }
 
   @override
   void initState() {
@@ -84,6 +99,8 @@ class _HomePageState extends State<HomePage> {
     if (!silent) SoundService.start();
     NotifyService.push(tr('Zapret активен', 'Zapret active'),
         icon: Icons.rocket_launch_rounded, sound: false);
+    // 💫 пульс от центра при старте
+    if (UiSettings.pulseFx.value) FxService.pulse();
     // ⚡ Оптимизация: ретрай статус вместо слепой задержки
     for (var i = 0; i < 5; i++) {
       await Future.delayed(const Duration(milliseconds: 300));
@@ -107,6 +124,8 @@ class _HomePageState extends State<HomePage> {
     if (!silent) SoundService.stop();
     NotifyService.push(tr('Остановлен', 'Stopped'),
         icon: Icons.stop_circle_rounded, sound: false);
+    // 💫 пульс от центра при стопе
+    if (UiSettings.pulseFx.value) FxService.pulse();
     for (var i = 0; i < 5; i++) {
       await Future.delayed(const Duration(milliseconds: 300));
       final running = await _zapret.isRunning();
@@ -206,15 +225,34 @@ class _HomePageState extends State<HomePage> {
                   child: Column(children: [
                     SizedBox(height: sc(10)),
                     _btn(tr('Запустить', 'Start'), Icons.rocket_launch_rounded,
-                        _isRunning ? null : () => _guard(_start),
-                        base: t.buttonColor, fg: t.buttonTextColor),
+                        _isRunning
+                            ? null
+                            : () {
+                                _firePulse(_startKey);
+                                _guard(_start);
+                              },
+                        base: t.buttonColor,
+                        fg: t.buttonTextColor,
+                        key: _startKey),
                     SizedBox(height: sc(6)),
                     _btn(tr('Остановить', 'Stop'), Icons.stop_circle_rounded,
-                        _isRunning ? () => _guard(_stop) : null,
-                        fg: const Color(0xFFEF4444)),
+                        _isRunning
+                            ? () {
+                                _firePulse(_stopKey);
+                                _guard(_stop);
+                              }
+                            : null,
+                        fg: const Color(0xFFEF4444), key: _stopKey),
                     SizedBox(height: sc(6)),
-                    _btn(tr('Перезапустить', 'Restart'), Icons.refresh_rounded,
-                        _isRunning ? () => _guard(_restart) : null),
+                    _btn(tr('Перезапустить', 'Restart'),
+                        Icons.refresh_rounded,
+                        _isRunning
+                            ? () {
+                                _firePulse(_restartKey);
+                                _guard(_restart);
+                              }
+                            : null,
+                        key: _restartKey),
                     SizedBox(height: sc(6)),
                     _btn(tr('В автозапуск', 'Add to Startup'), Icons.start_rounded,
                         () async {
@@ -368,10 +406,14 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
-  Widget _btn(String label, IconData icon, VoidCallback? onPressed, {Color? base, Color? fg}) {
+
+
+  Widget _btn(String label, IconData icon, VoidCallback? onPressed,
+      {Color? base, Color? fg, Key? key}) {
     final b = base ?? t.surface;
     final f = fg ?? t.text;
     return Opacity(
+      key: key,
       opacity: onPressed == null ? 0.4 : 1,
       child: Btn25D(
         base: b,

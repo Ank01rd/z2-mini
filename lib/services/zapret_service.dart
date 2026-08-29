@@ -120,9 +120,31 @@ class ZapretService {
   Future<String> installService(String folder, {String? config}) async {
     final configs = await scanConfigs();
     if (configs.isEmpty) return 'Нет конфигов для автозапуска';
-    final cfg = (config != null && configs.contains(config))
-        ? config
-        : (configs.contains('general.bat') ? 'general.bat' : configs.first);
+
+    // 🔍 ищем выбранный конфиг (case-insensitive + trim)
+    String? cfg;
+    if (config != null && config.isNotEmpty) {
+      final lower = config.toLowerCase().trim();
+      for (final c in configs) {
+        if (c.toLowerCase().trim() == lower) {
+          cfg = c;
+          break;
+        }
+      }
+    }
+
+    // fallback: general (ALT) → general.bat → первый в списке
+    if (cfg == null) {
+      if (configs.any((c) => c.toLowerCase().contains('general (alt)'))) {
+        cfg = configs.firstWhere(
+            (c) => c.toLowerCase().contains('general (alt)'));
+      } else if (configs.any((c) => c.toLowerCase() == 'general.bat')) {
+        cfg = configs.firstWhere((c) => c.toLowerCase() == 'general.bat');
+      } else {
+        cfg = configs.first;
+      }
+    }
+
     await Process.run('powershell', [
       '-Command',
       'Start-Process -FilePath "schtasks" '

@@ -1,15 +1,13 @@
-import 'package:flutter/foundation.dart'; // 👈 Добавь эту строку
+import 'package:flutter/foundation.dart';
 import 'dart:async';
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import '../../core/app_theme.dart';
 import '../../core/notify_service.dart';
 import '../../core/ui_scale.dart';
+import '../../core/ui_settings.dart';
 
-/// 🔔 Dynamic Island + адаптивное позиционирование под сайдбар:
-///    сайдбар слева/справа → тосты сверху в противоположном углу
-///    сайдбар сверху      → тосты справа-снизу (под рельсом)
-///    сайдбар снизу       → тосты справа-сверху (над рельсом)
+/// 🔔 Dynamic Island + адаптивное позиционирование под сайдбар + 3 стиля тостов
 class NotifyBell extends StatefulWidget {
   final AppTheme theme;
   final ValueListenable<int> sidebarPos;
@@ -58,12 +56,11 @@ class _NotifyBellState extends State<NotifyBell>
   @override
   Widget build(BuildContext context) {
     final t = widget.theme;
-    // 📍 позиция тоста в зависимости от сайдбара
     return ValueListenableBuilder<int>(
       valueListenable: widget.sidebarPos,
       builder: (ctx, pos, _) {
-        final bool leftCorner = pos == 1; // сайдбар справа → тост слева
-        final bool useBottom = pos == 1 || pos == 2; // справа/сверху → тост снизу
+        final bool leftCorner = pos == 1;
+        final bool useBottom = pos == 1 || pos == 2;
         return Positioned(
           top: useBottom ? null : sc(80),
           bottom: useBottom ? sc(20) : null,
@@ -88,6 +85,34 @@ class _NotifyBellState extends State<NotifyBell>
                   : showProgress
                       ? sc(58)
                       : sc(44);
+              // 🎨 стиль тостов: 0 стекло, 1 неон, 2 минимал
+              final ts = UiSettings.toastStyle.value;
+              final deco = BoxDecoration(
+                color: ts == 2
+                    ? Colors.black.withOpacity(0.35)
+                    : Colors.black.withOpacity(0.92),
+                borderRadius:
+                    BorderRadius.circular(h > sc(60) ? sc(28) : 999),
+                border: ts == 1
+                    ? Border.all(
+                        color: t.accent.withOpacity(0.8), width: 1.5)
+                    : (ts == 0 && !expanded)
+                        ? Border.all(
+                            color: Colors.white.withOpacity(0.2), width: 1)
+                        : null,
+                boxShadow: ts == 1
+                    ? [
+                        BoxShadow(
+                            color: t.accent.withOpacity(0.35),
+                            blurRadius: sc(18)),
+                      ]
+                    : [
+                        BoxShadow(
+                            color: Colors.black.withOpacity(0.5),
+                            blurRadius: sc(14),
+                            offset: Offset(0, sc(4))),
+                      ],
+              );
               return GestureDetector(
                 behavior: HitTestBehavior.opaque,
                 onTap: () => _tap(banner),
@@ -96,21 +121,7 @@ class _NotifyBellState extends State<NotifyBell>
                   curve: Curves.easeOutCubic,
                   width: w,
                   height: h,
-                  decoration: BoxDecoration(
-                    color: Colors.black.withOpacity(0.92),
-                    borderRadius:
-                        BorderRadius.circular(h > sc(60) ? sc(28) : 999),
-                    border: expanded
-                        ? null
-                        : Border.all(
-                            color: Colors.white.withOpacity(0.2), width: 1),
-                    boxShadow: [
-                      BoxShadow(
-                          color: Colors.black.withOpacity(0.5),
-                          blurRadius: sc(14),
-                          offset: Offset(0, sc(4))),
-                    ],
-                  ),
+                  decoration: deco,
                   child: ClipRRect(
                     borderRadius:
                         BorderRadius.circular(h > sc(60) ? sc(28) : 999),
@@ -122,7 +133,9 @@ class _NotifyBellState extends State<NotifyBell>
                           bottom: 0,
                           right: sc(44),
                           child: LayoutBuilder(builder: (ctx, c) {
-                            if (c.maxWidth < sc(90)) return const SizedBox.shrink();
+                            if (c.maxWidth < sc(90)) {
+                              return const SizedBox.shrink();
+                            }
                             return showResults
                                 ? _resultsContent(t, banner!)
                                 : showProgress
@@ -136,7 +149,9 @@ class _NotifyBellState extends State<NotifyBell>
                               top: 0,
                               bottom: 0,
                               child: _cap(t, true,
-                                  showProgress ? Icons.download_rounded : null))
+                                  showProgress
+                                      ? Icons.download_rounded
+                                      : null))
                           : Center(child: _cap(t, false)),
                     ]),
                   ),
@@ -227,51 +242,52 @@ class _NotifyBellState extends State<NotifyBell>
   Widget _resultsContent(AppTheme t, NotifyItem n) => Padding(
         padding: EdgeInsets.fromLTRB(sc(16), sc(12), sc(10), sc(10)),
         child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(children: [
-                Icon(n.icon, color: t.accent, size: sc(15)),
-                SizedBox(width: sc(6)),
-                Expanded(
-                  child: Text(n.text,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                          color: Colors.white,
-                          fontSize: sc(13),
-                          fontWeight: FontWeight.w800,
-                          decoration: TextDecoration.none)),
-                ),
-              ]),
-              SizedBox(height: sc(8)),
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(children: [
+              Icon(n.icon, color: t.accent, size: sc(15)),
+              SizedBox(width: sc(6)),
               Expanded(
-                child: SingleChildScrollView(
-                  child: Column(children: [
-                    for (final l in n.lines!)
-                      Padding(
-                        padding: EdgeInsets.only(bottom: sc(5)),
-                        child: Row(children: [
-                          Icon(
-                              l.ok
-                                  ? Icons.check_circle_rounded
-                                  : Icons.cancel_rounded,
-                              size: sc(14),
-                              color: l.ok
-                                  ? const Color(0xFF22C55E)
-                                  : const Color(0xFFEF4444)),
-                          SizedBox(width: sc(6)),
-                          Expanded(
-                            child: Text(l.text,
-                                style: TextStyle(
-                                    color: Colors.white.withOpacity(0.9),
-                                    fontSize: sc(11),
-                                    fontWeight: FontWeight.w600,
-                                    decoration: TextDecoration.none)),
-                          ),
-                        ]),
-                      ),
-                  ]),
-                ),
+                child: Text(n.text,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                        color: Colors.white,
+                        fontSize: sc(13),
+                        fontWeight: FontWeight.w800,
+                        decoration: TextDecoration.none)),
               ),
             ]),
+            SizedBox(height: sc(8)),
+            Expanded(
+              child: SingleChildScrollView(
+                child: Column(children: [
+                  for (final l in n.lines!)
+                    Padding(
+                      padding: EdgeInsets.only(bottom: sc(5)),
+                      child: Row(children: [
+                        Icon(
+                            l.ok
+                                ? Icons.check_circle_rounded
+                                : Icons.cancel_rounded,
+                            size: sc(14),
+                            color: l.ok
+                                ? const Color(0xFF22C55E)
+                                : const Color(0xFFEF4444)),
+                        SizedBox(width: sc(6)),
+                        Expanded(
+                          child: Text(l.text,
+                              style: TextStyle(
+                                  color: Colors.white.withOpacity(0.9),
+                                  fontSize: sc(11),
+                                  fontWeight: FontWeight.w600,
+                                  decoration: TextDecoration.none)),
+                        ),
+                      ]),
+                    ),
+                ]),
+              ),
+            ),
+          ],
+        ),
       );
 }
